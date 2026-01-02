@@ -1,8 +1,15 @@
 'use client'
 
-import { Wallet } from '@/lib/store'
 import { formatCurrency } from '@/lib/utils'
 import { Wallet as WalletIcon, Building2, Smartphone, MoreHorizontal } from 'lucide-react'
+
+interface Wallet {
+  id: string
+  name: string
+  balance: number
+  colorHex: string
+  icon: string
+}
 
 interface WalletCardProps {
   wallet: Wallet

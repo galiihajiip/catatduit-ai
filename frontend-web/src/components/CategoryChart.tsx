@@ -1,14 +1,22 @@
 'use client'
 
-import { CategoryBreakdown } from '@/lib/store'
 import { formatCurrency, getCategoryIcon } from '@/lib/utils'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+
+interface CategoryBreakdown {
+  category: string
+  amount: number
+  percentage: number
+  colorHex: string
+}
 
 interface CategoryChartProps {
   data: CategoryBreakdown[]
 }
 
 export default function CategoryChart({ data }: CategoryChartProps) {
+  if (!data || data.length === 0) return null
+  
   return (
     <div className="bg-card rounded-card shadow-card p-5">
       <h3 className="text-base font-semibold text-text-primary mb-5">Pengeluaran per Kategori</h3>

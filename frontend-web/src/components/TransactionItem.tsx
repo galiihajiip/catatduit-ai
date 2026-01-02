@@ -1,7 +1,17 @@
 'use client'
 
-import { Transaction } from '@/lib/store'
 import { formatCurrency, formatDate, getCategoryIcon } from '@/lib/utils'
+
+interface Transaction {
+  id: string
+  walletId: string
+  categoryId: string
+  type: 'expense' | 'income' | 'transfer'
+  amount: number
+  description: string
+  aiConfidence?: number
+  createdAt: string
+}
 
 interface TransactionItemProps {
   transaction: Transaction

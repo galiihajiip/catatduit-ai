@@ -1,8 +1,16 @@
 'use client'
 
-import { MonthlySummary } from '@/lib/store'
 import { formatCurrency } from '@/lib/utils'
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react'
+
+interface MonthlySummary {
+  month: string
+  totalIncome: number
+  totalExpense: number
+  netIncome: number
+  expenseRatio: number
+  savingRatio: number
+}
 
 interface SummaryCardProps {
   summary: MonthlySummary
