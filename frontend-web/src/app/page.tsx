@@ -223,7 +223,7 @@ export default function Home() {
       {/* Telegram CTA */}
       <section className="px-5 mb-6">
         <a 
-          href="https://t.me/CatatDuitAIBot"
+          href="https://t.me/catatduitgalih_bot"
           target="_blank"
           rel="noopener noreferrer"
           className="block bg-accent-blue text-white rounded-card p-4 text-center hover:bg-accent-blue/90 transition-colors"
@@ -236,7 +236,7 @@ export default function Home() {
       
       {/* FAB */}
       <a 
-        href="https://t.me/CatatDuitAIBot"
+        href="https://t.me/catatduitgalih_bot"
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-6 right-6 bg-primary text-white px-5 py-3 rounded-full shadow-lg flex items-center gap-2 hover:bg-primary-light transition-colors"
