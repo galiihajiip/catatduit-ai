@@ -137,8 +137,8 @@ export default function Sidebar({
           })}
         </nav>
         
-        {/* Telegram CTA */}
-        <div className="px-4 pb-4">
+        {/* Social Links */}
+        <div className="px-4 pb-2 space-y-2">
           <a
             href="https://t.me/caborin_bot"
             target="_blank"
@@ -149,6 +149,19 @@ export default function Sidebar({
             <div>
               <p className="font-medium text-sm">Telegram Bot</p>
               <p className="text-xs opacity-80">Chat untuk catat</p>
+            </div>
+          </a>
+          
+          <a
+            href="https://instagram.com/catatin.duit"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-pink-500/10 to-purple-500/10 text-pink-600 rounded-xl hover:from-pink-500/20 hover:to-purple-500/20 transition-all"
+          >
+            <Icons.instagram className="w-5 h-5" />
+            <div>
+              <p className="font-medium text-sm">Instagram</p>
+              <p className="text-xs opacity-80">@catatin.duit</p>
             </div>
           </a>
         </div>

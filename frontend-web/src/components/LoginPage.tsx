@@ -126,8 +126,29 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </ol>
         </div>
 
-        {/* Footer */}
-        <p className="text-center text-text-secondary text-xs mt-6">
+        {/* Footer with Social Links */}
+        <div className="mt-6 flex items-center justify-center gap-4">
+          <a
+            href="https://t.me/caborin_bot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-2 bg-accent-blue/10 text-accent-blue rounded-lg hover:bg-accent-blue/20 transition-colors"
+            title="Telegram"
+          >
+            <Icons.telegram className="w-5 h-5" />
+          </a>
+          <a
+            href="https://instagram.com/catatin.duit"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-2 bg-gradient-to-br from-pink-500/10 to-purple-500/10 text-pink-600 rounded-lg hover:from-pink-500/20 hover:to-purple-500/20 transition-colors"
+            title="Instagram"
+          >
+            <Icons.instagram className="w-5 h-5" />
+          </a>
+        </div>
+        
+        <p className="text-center text-text-secondary text-xs mt-4">
           © 2025 Catat.in Duit. Kelola keuangan dengan AI.
         </p>
       </div>
