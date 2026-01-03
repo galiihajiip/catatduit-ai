@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY
+
+// Return empty data if env vars missing (for build time)
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('Missing Supabase credentials - API will return empty data')
+}
 
 export async function GET(request: NextRequest) {
+  // Handle missing env vars gracefully
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.json({ transactions: [] })
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey)
+  
   const { searchParams } = new URL(request.url)
   const telegramId = searchParams.get('telegram_id')
   
@@ -37,5 +47,5 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(50)
   
-  return NextResponse.json({ transactions })
+  return NextResponse.json({ transactions: transactions || [] })
 }
