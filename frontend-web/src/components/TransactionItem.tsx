@@ -23,11 +23,11 @@ export default function TransactionItem({ transaction, categoryName, categoryCol
   const isExpense = transaction.type === 'expense'
   
   return (
-    <div className="bg-card rounded-xl p-4 flex items-center gap-3">
+    <div className="flex items-center gap-4">
       {/* Icon */}
       <div
-        className="w-12 h-12 rounded-xl flex items-center justify-center text-xl"
-        style={{ backgroundColor: `${categoryColor}1A` }}
+        className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+        style={{ backgroundColor: `${categoryColor}15` }}
       >
         {getCategoryIcon(categoryName)}
       </div>
@@ -37,21 +37,24 @@ export default function TransactionItem({ transaction, categoryName, categoryCol
         <p className="text-sm font-medium text-text-primary truncate">
           {transaction.description}
         </p>
-        <p className="text-xs text-text-secondary mt-1">
-          {formatDate(transaction.createdAt)}
-        </p>
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-xs text-text-secondary">
+            {formatDate(transaction.createdAt)}
+          </p>
+          {transaction.aiConfidence && (
+            <span className="px-1.5 py-0.5 bg-accent-blue/10 rounded text-[10px] font-medium text-accent-blue">
+              AI {(transaction.aiConfidence * 100).toFixed(0)}%
+            </span>
+          )}
+        </div>
       </div>
       
       {/* Amount */}
-      <div className="text-right">
+      <div className="text-right flex-shrink-0">
         <p className={`text-sm font-semibold ${isExpense ? 'text-accent-red' : 'text-primary'}`}>
           {isExpense ? '-' : '+'}{formatCurrency(transaction.amount)}
         </p>
-        {transaction.aiConfidence && (
-          <span className="inline-block mt-1 px-1.5 py-0.5 bg-accent-blue/10 rounded text-[10px] text-accent-blue">
-            AI {(transaction.aiConfidence * 100).toFixed(0)}%
-          </span>
-        )}
+        <p className="text-xs text-text-secondary mt-0.5">{categoryName}</p>
       </div>
     </div>
   )
