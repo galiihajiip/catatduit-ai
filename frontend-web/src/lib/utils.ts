@@ -27,15 +27,27 @@ export function formatDate(dateString: string): string {
 export function getCategoryIcon(category: string): string {
   const icons: Record<string, string> = {
     'Makanan': '🍽️',
+    'Makanan & Minuman': '🍽️',
     'Transportasi': '🚗',
     'Tagihan': '📄',
+    'Tagihan & Utilitas': '📄',
     'Keperluan Rumah Tangga': '🏠',
+    'Rumah Tangga': '🏠',
     'Belanja': '🛍️',
+    'Belanja Pribadi': '🛍️',
     'Hiburan': '🎬',
     'Kesehatan': '💊',
     'Pemasukan': '💰',
     'Gaji': '💼',
     'Bonus': '🎁',
+    'Investasi': '📈',
+    'Pendidikan': '📚',
+    'Olahraga': '⚽',
+    'Kecantikan': '💄',
+    'Elektronik': '📱',
+    'Donasi': '❤️',
+    'Asuransi': '🛡️',
+    'Pajak': '🏛️',
     'Lainnya': '📦',
   }
   return icons[category] || '📦'
