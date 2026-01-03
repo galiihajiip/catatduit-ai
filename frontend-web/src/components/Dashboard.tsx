@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { formatCurrency, getCategoryIcon } from '@/lib/utils'
+import { Icons } from './Icons'
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   AreaChart, Area, XAxis, YAxis, CartesianGrid
@@ -37,13 +38,11 @@ export default function Dashboard({
   const sortedWallets = [...(analytics.wallets || [])].sort((a, b) => b.balance - a.balance)
   const displayWallets = showAllWallets ? sortedWallets : sortedWallets.slice(0, 3)
 
-  // Calculate growth
   const previousMonthIncome = analytics.summary?.totalIncome * 0.85 || 0
   const incomeGrowth = previousMonthIncome > 0 
     ? ((analytics.summary?.totalIncome - previousMonthIncome) / previousMonthIncome * 100) 
     : 0
 
-  // Trend data
   const trendData = [
     { month: 'Jul', income: 8500000, expense: 4200000 },
     { month: 'Agu', income: 9200000, expense: 4800000 },
@@ -53,7 +52,6 @@ export default function Dashboard({
     { month: 'Des', income: analytics.summary?.totalIncome || 12000000, expense: analytics.summary?.totalExpense || 4500000 },
   ]
 
-  // Category frequency
   const categoryFrequency = analytics.categoryBreakdown?.map((cat: any) => ({
     ...cat,
     transactions: Math.floor(Math.random() * 20) + 5,
@@ -68,7 +66,10 @@ export default function Dashboard({
       {/* Header with Month/Year Filter */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">📊 Monthly Report</h1>
+          <div className="flex items-center gap-2">
+            <Icons.chart className="w-6 h-6 text-primary" />
+            <h1 className="text-2xl font-bold text-text-primary">Monthly Report</h1>
+          </div>
           <p className="text-text-secondary text-sm mt-1">
             {months[selectedMonth]} {selectedYear}
           </p>
@@ -107,7 +108,7 @@ export default function Dashboard({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                  <span className="text-2xl">💰</span>
+                  <Icons.wallet className="w-6 h-6 text-white" />
                 </div>
                 <div>
                   <p className="text-white/80 text-sm">Kantong Kamu</p>
@@ -123,13 +124,17 @@ export default function Dashboard({
             {/* Wallet List - Rincian Saldo */}
             <div className="mt-6 space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-white/80 text-sm font-medium">📍 Rincian Saldo</p>
+                <div className="flex items-center gap-2">
+                  <Icons.creditCard className="w-4 h-4 text-white/80" />
+                  <p className="text-white/80 text-sm font-medium">Rincian Saldo</p>
+                </div>
                 {sortedWallets.length > 3 && (
                   <button 
                     onClick={() => setShowAllWallets(!showAllWallets)}
                     className="text-white/80 text-xs hover:text-white flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full"
                   >
-                    {showAllWallets ? 'Sembunyikan' : 'Lihat Semua'} →
+                    {showAllWallets ? 'Sembunyikan' : 'Lihat Semua'}
+                    <Icons.chevronRight className={`w-3 h-3 transition-transform ${showAllWallets ? 'rotate-90' : ''}`} />
                   </button>
                 )}
               </div>
@@ -145,7 +150,7 @@ export default function Dashboard({
                         className="w-8 h-8 rounded-lg flex items-center justify-center"
                         style={{ backgroundColor: wallet.color_hex + '40' }}
                       >
-                        <span>{wallet.icon || '💳'}</span>
+                        <Icons.creditCard className="w-4 h-4" style={{ color: wallet.color_hex }} />
                       </div>
                       <span className="text-white/90 text-sm font-medium truncate">{wallet.name}</span>
                     </div>
@@ -161,7 +166,7 @@ export default function Dashboard({
             <StatCard
               title="Total Pemasukan"
               value={formatCurrency(analytics.summary?.totalIncome || 0)}
-              icon="📥"
+              icon={<Icons.arrowDown className="w-5 h-5" />}
               trend={`+${incomeGrowth.toFixed(1)}%`}
               trendUp={true}
               color="green"
@@ -169,7 +174,7 @@ export default function Dashboard({
             <StatCard
               title="Total Pengeluaran"
               value={formatCurrency(analytics.summary?.totalExpense || 0)}
-              icon="📤"
+              icon={<Icons.arrowUp className="w-5 h-5" />}
               trend={`${analytics.summary?.expenseRatio?.toFixed(1) || 0}%`}
               trendUp={false}
               color="red"
@@ -177,7 +182,7 @@ export default function Dashboard({
             <StatCard
               title="Net Income"
               value={formatCurrency(analytics.summary?.netIncome || 0)}
-              icon="💎"
+              icon={<Icons.trendUp className="w-5 h-5" />}
               trend={analytics.summary?.netIncome >= 0 ? 'Surplus' : 'Defisit'}
               trendUp={analytics.summary?.netIncome >= 0}
               color={analytics.summary?.netIncome >= 0 ? 'primary' : 'red'}
@@ -186,13 +191,16 @@ export default function Dashboard({
 
           {/* Financial Analysis */}
           <div className="bg-card rounded-2xl p-6 shadow-card">
-            <h3 className="text-lg font-semibold text-text-primary mb-4">📈 Analisis Keuangan</h3>
+            <div className="flex items-center gap-2 mb-4">
+              <Icons.activity className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold text-text-primary">Analisis Keuangan</h3>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <AnalysisCard
                 title="Rasio Pengeluaran"
                 value={`${analytics.summary?.expenseRatio?.toFixed(1) || 0}%`}
                 description="% pemasukan yang digunakan untuk pengeluaran"
-                icon="📊"
+                icon={<Icons.chart className="w-5 h-5" />}
                 color="orange"
                 progress={analytics.summary?.expenseRatio || 0}
               />
@@ -200,7 +208,7 @@ export default function Dashboard({
                 title="Pertumbuhan Pendapatan"
                 value={`${incomeGrowth >= 0 ? '+' : ''}${incomeGrowth.toFixed(1)}%`}
                 description="Perbandingan dengan bulan sebelumnya"
-                icon="📈"
+                icon={<Icons.trendUp className="w-5 h-5" />}
                 color={incomeGrowth >= 0 ? 'green' : 'red'}
                 progress={Math.min(Math.abs(incomeGrowth), 100)}
               />
@@ -208,7 +216,7 @@ export default function Dashboard({
                 title="Rasio Tabungan"
                 value={`${analytics.summary?.savingRatio?.toFixed(1) || 0}%`}
                 description="Jumlah uang yang berhasil disimpan"
-                icon="🐷"
+                icon={<Icons.piggyBank className="w-5 h-5" />}
                 color="primary"
                 progress={analytics.summary?.savingRatio || 0}
               />
@@ -218,9 +226,12 @@ export default function Dashboard({
           {/* Trend Chart */}
           <div className="bg-card rounded-2xl p-6 shadow-card">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <div>
-                <h3 className="text-lg font-semibold text-text-primary">📉 Tren Pemasukan & Pengeluaran</h3>
-                <p className="text-sm text-text-secondary">Perbandingan bulanan/mingguan</p>
+              <div className="flex items-center gap-2">
+                <Icons.trendUp className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="text-lg font-semibold text-text-primary">Tren Pemasukan & Pengeluaran</h3>
+                  <p className="text-sm text-text-secondary">Perbandingan bulanan/mingguan</p>
+                </div>
               </div>
               <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
                 {(['3', '6', '12'] as const).map((period) => (
@@ -294,7 +305,10 @@ export default function Dashboard({
         <div className="space-y-6">
           {/* Category Breakdown with Pie Chart */}
           <div className="bg-card rounded-2xl p-6 shadow-card">
-            <h3 className="text-lg font-semibold text-text-primary mb-4">🏷️ Kategori Pengeluaran</h3>
+            <div className="flex items-center gap-2 mb-4">
+              <Icons.pieChart className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold text-text-primary">Kategori Pengeluaran</h3>
+            </div>
             
             {/* Pie Chart */}
             <div className="h-48 mb-6">
@@ -345,8 +359,11 @@ export default function Dashboard({
 
           {/* Top 5 Frequency */}
           <div className="bg-card rounded-2xl p-6 shadow-card">
-            <h3 className="text-lg font-semibold text-text-primary mb-4">🔥 Top 5 Frekuensi Pengeluaran</h3>
-            <p className="text-xs text-text-secondary mb-4">Kategori dengan pengeluaran terbesar dalam periode ini</p>
+            <div className="flex items-center gap-2 mb-2">
+              <Icons.target className="w-5 h-5 text-accent-orange" />
+              <h3 className="text-lg font-semibold text-text-primary">Top 5 Frekuensi</h3>
+            </div>
+            <p className="text-xs text-text-secondary mb-4">Kategori dengan pengeluaran terbesar</p>
             
             <div className="space-y-3">
               {categoryFrequency.slice(0, 5).map((cat: any, index: number) => (
@@ -374,7 +391,10 @@ export default function Dashboard({
             
             {/* Frequency Summary */}
             <div className="mt-6 p-4 bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl">
-              <h4 className="text-sm font-semibold text-text-primary mb-3">📋 Ringkasan Frekuensi</h4>
+              <div className="flex items-center gap-2 mb-3">
+                <Icons.receipt className="w-4 h-4 text-primary" />
+                <h4 className="text-sm font-semibold text-text-primary">Ringkasan Frekuensi</h4>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white/50 rounded-lg p-3">
                   <p className="text-2xl font-bold text-primary">{totalTransactions}</p>
@@ -396,7 +416,10 @@ export default function Dashboard({
 
           {/* Distribution Pie Chart */}
           <div className="bg-card rounded-2xl p-6 shadow-card">
-            <h3 className="text-lg font-semibold text-text-primary mb-4">🥧 Distribusi Pengeluaran</h3>
+            <div className="flex items-center gap-2 mb-4">
+              <Icons.pieChart className="w-5 h-5 text-accent-blue" />
+              <h3 className="text-lg font-semibold text-text-primary">Distribusi Pengeluaran</h3>
+            </div>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -428,7 +451,7 @@ export default function Dashboard({
 function StatCard({ title, value, icon, trend, trendUp, color }: {
   title: string
   value: string
-  icon: string
+  icon: React.ReactNode
   trend: string
   trendUp: boolean
   color: 'primary' | 'green' | 'red' | 'orange'
@@ -444,7 +467,7 @@ function StatCard({ title, value, icon, trend, trendUp, color }: {
     <div className="bg-card rounded-2xl p-5 shadow-card hover:shadow-lg transition-shadow">
       <div className="flex items-center justify-between mb-3">
         <div className={`p-2.5 rounded-xl ${colorClasses[color]}`}>
-          <span className="text-xl">{icon}</span>
+          {icon}
         </div>
         <span className={`text-xs font-medium px-2 py-1 rounded-full ${
           trendUp ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
@@ -463,7 +486,7 @@ function AnalysisCard({ title, value, description, icon, color, progress }: {
   title: string
   value: string
   description: string
-  icon: string
+  icon: React.ReactNode
   color: 'primary' | 'green' | 'red' | 'orange'
   progress: number
 }) {
@@ -478,7 +501,7 @@ function AnalysisCard({ title, value, description, icon, color, progress }: {
     <div className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
       <div className="flex items-center gap-2 mb-3">
         <div className={`p-2 rounded-lg ${colorClasses[color].bg} ${colorClasses[color].text}`}>
-          <span className="text-lg">{icon}</span>
+          {icon}
         </div>
         <span className="text-sm font-medium text-text-primary">{title}</span>
       </div>

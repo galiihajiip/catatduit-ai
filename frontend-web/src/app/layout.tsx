@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'CatatDuit AI - Personal Finance Manager',
+  title: 'Catat.in Duit - AI Finance Manager',
   description: 'AI-powered personal finance management. Cukup chat, keuangan langsung tercatat & dianalisis.',
 }
 

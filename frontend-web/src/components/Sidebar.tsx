@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Icons } from './Icons'
 
 interface SidebarProps {
   activeTab: string
@@ -14,11 +15,11 @@ interface SidebarProps {
 }
 
 const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
-  { id: 'wallets', label: 'Dompet', icon: '💰' },
-  { id: 'analytics', label: 'Analisis', icon: '📊' },
-  { id: 'history', label: 'Riwayat', icon: '📜' },
-  { id: 'settings', label: 'Pengaturan', icon: '⚙️' },
+  { id: 'dashboard', label: 'Dashboard', icon: Icons.home },
+  { id: 'wallets', label: 'Dompet', icon: Icons.wallet },
+  { id: 'analytics', label: 'Analisis', icon: Icons.pieChart },
+  { id: 'history', label: 'Riwayat', icon: Icons.history },
+  { id: 'settings', label: 'Pengaturan', icon: Icons.settings },
 ]
 
 export default function Sidebar({ 
@@ -61,10 +62,14 @@ export default function Sidebar({
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-light rounded-xl flex items-center justify-center shadow-lg shadow-primary/30">
-              <span className="text-white font-bold text-lg">💵</span>
+              <Icons.dollarSign className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="font-bold text-text-primary text-lg">CatatDuit</h1>
+              <h1 className="font-bold text-text-primary text-lg">
+                <span className="text-primary">Catat</span>
+                <span className="text-accent-orange">.in</span>
+                <span className="text-text-primary"> Duit</span>
+              </h1>
               <p className="text-xs text-text-secondary">AI Finance Manager</p>
             </div>
           </div>
@@ -72,7 +77,7 @@ export default function Sidebar({
             onClick={onToggle}
             className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
           >
-            <span className="text-xl">✕</span>
+            <Icons.close className="w-5 h-5 text-text-secondary" />
           </button>
         </div>
 
@@ -84,13 +89,13 @@ export default function Sidebar({
               className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors"
             >
               <div className="w-10 h-10 bg-gradient-to-br from-accent-blue to-blue-600 rounded-full flex items-center justify-center">
-                <span className="text-white">👤</span>
+                <Icons.user className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 text-left">
                 <p className="font-medium text-text-primary text-sm">{userName || 'User'}</p>
                 <p className="text-xs text-text-secondary">ID: {telegramId}</p>
               </div>
-              <span className={`transition-transform ${showUserMenu ? 'rotate-180' : ''}`}>▼</span>
+              <Icons.chevronDown className={`w-4 h-4 text-text-secondary transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
             </button>
             
             {showUserMenu && (
@@ -99,7 +104,8 @@ export default function Sidebar({
                   onClick={onLogout}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-accent-red hover:bg-white rounded-lg transition-colors"
                 >
-                  🚪 Keluar
+                  <Icons.logout className="w-4 h-4" />
+                  Keluar
                 </button>
               </div>
             )}
@@ -109,6 +115,7 @@ export default function Sidebar({
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
           {menuItems.map((item) => {
+            const Icon = item.icon
             const isActive = activeTab === item.id
             return (
               <button
@@ -120,7 +127,7 @@ export default function Sidebar({
                     : 'text-text-secondary hover:bg-gray-50 hover:text-text-primary'
                 }`}
               >
-                <span className="text-lg">{item.icon}</span>
+                <Icon className="w-5 h-5" />
                 <span className="font-medium">{item.label}</span>
                 {item.id === 'analytics' && isPro && (
                   <span className="ml-auto px-2 py-0.5 bg-yellow-400/20 text-yellow-600 text-xs rounded-full">PRO</span>
@@ -133,12 +140,12 @@ export default function Sidebar({
         {/* Telegram CTA */}
         <div className="px-4 pb-4">
           <a
-            href="https://t.me/catatduitgalih_bot"
+            href="https://t.me/caborin_bot"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-accent-blue/10 to-blue-500/10 text-accent-blue rounded-xl hover:from-accent-blue/20 hover:to-blue-500/20 transition-all"
           >
-            <span className="text-xl">💬</span>
+            <Icons.telegram className="w-5 h-5" />
             <div>
               <p className="font-medium text-sm">Telegram Bot</p>
               <p className="text-xs opacity-80">Chat untuk catat</p>
@@ -151,7 +158,7 @@ export default function Sidebar({
           <div className="px-4 pb-6">
             <div className="p-4 bg-gradient-to-br from-yellow-400/10 to-orange-400/10 rounded-xl border border-yellow-400/20">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl">👑</span>
+                <Icons.crown className="w-5 h-5 text-yellow-500" />
                 <span className="font-semibold text-text-primary">Upgrade Pro</span>
               </div>
               <p className="text-xs text-text-secondary mb-3">Fitur lengkap & tanpa batas</p>
@@ -173,7 +180,7 @@ export function HamburgerButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       className="lg:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
     >
-      <span className="text-2xl">☰</span>
+      <Icons.menu className="w-6 h-6 text-text-primary" />
     </button>
   )
 }

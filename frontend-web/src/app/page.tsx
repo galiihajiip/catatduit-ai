@@ -5,6 +5,7 @@ import Sidebar, { HamburgerButton } from '@/components/Sidebar'
 import Dashboard from '@/components/Dashboard'
 import LoginPage from '@/components/LoginPage'
 import { UpgradeModal } from '@/components/ProBadge'
+import { Icons } from '@/components/Icons'
 import { formatCurrency } from '@/lib/utils'
 
 interface Analytics {
@@ -56,11 +57,6 @@ const emptyAnalytics: Analytics = {
   transactionCount: 0
 }
 
-const months = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-]
-
 export default function Home() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -72,7 +68,6 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   
-  // Date filters
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   
@@ -140,9 +135,21 @@ export default function Home() {
     return <LoginPage onLogin={handleLogin} />
   }
 
+  const getPageTitle = () => {
+    switch (activeTab) {
+      case 'dashboard': return { icon: <Icons.home className="w-5 h-5" />, text: 'Dashboard' }
+      case 'wallets': return { icon: <Icons.wallet className="w-5 h-5" />, text: 'Dompet' }
+      case 'analytics': return { icon: <Icons.pieChart className="w-5 h-5" />, text: 'Analisis' }
+      case 'history': return { icon: <Icons.history className="w-5 h-5" />, text: 'Riwayat' }
+      case 'settings': return { icon: <Icons.settings className="w-5 h-5" />, text: 'Pengaturan' }
+      default: return { icon: <Icons.home className="w-5 h-5" />, text: 'Dashboard' }
+    }
+  }
+
+  const pageTitle = getPageTitle()
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Sidebar */}
       <Sidebar 
         activeTab={activeTab} 
         onTabChange={setActiveTab} 
@@ -154,21 +161,14 @@ export default function Home() {
         onLogout={handleLogout}
       />
       
-      {/* Main Content */}
       <main className="lg:pl-72">
-        {/* Top Header */}
         <header className="sticky top-0 z-30 bg-card/80 backdrop-blur-lg border-b border-gray-100">
           <div className="flex items-center justify-between px-4 lg:px-8 py-4">
             <div className="flex items-center gap-4">
               <HamburgerButton onClick={() => setSidebarOpen(true)} />
-              <div className="hidden sm:block">
-                <h1 className="text-lg font-semibold text-text-primary">
-                  {activeTab === 'dashboard' && '📊 Dashboard'}
-                  {activeTab === 'wallets' && '💰 Dompet'}
-                  {activeTab === 'analytics' && '📈 Analisis'}
-                  {activeTab === 'history' && '📜 Riwayat'}
-                  {activeTab === 'settings' && '⚙️ Pengaturan'}
-                </h1>
+              <div className="hidden sm:flex items-center gap-2">
+                <span className="text-primary">{pageTitle.icon}</span>
+                <h1 className="text-lg font-semibold text-text-primary">{pageTitle.text}</h1>
               </div>
             </div>
             
@@ -178,29 +178,28 @@ export default function Home() {
                 disabled={loading}
                 className="flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
               >
-                <span className={loading ? 'animate-spin' : ''}>🔄</span>
+                <Icons.refresh className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">Refresh</span>
               </button>
               
               <a
-                href="https://t.me/catatduitgalih_bot"
+                href="https://t.me/caborin_bot"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 px-3 py-2 text-sm bg-accent-blue/10 text-accent-blue rounded-xl hover:bg-accent-blue/20 transition-colors"
               >
-                <span>💬</span>
+                <Icons.telegram className="w-4 h-4" />
                 <span className="hidden sm:inline">Telegram</span>
               </a>
               
               <button className="p-2 hover:bg-gray-100 rounded-xl transition-colors relative">
-                <span>🔔</span>
+                <Icons.bell className="w-5 h-5 text-text-secondary" />
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent-red rounded-full"></span>
               </button>
             </div>
           </div>
         </header>
 
-        {/* Page Content */}
         <div className="p-4 lg:p-8 pb-24 lg:pb-8">
           {activeTab === 'dashboard' && (
             <Dashboard
@@ -248,26 +247,31 @@ function WalletsPage({ wallets }: { wallets: any[] }) {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">💰 Dompet Saya</h1>
+          <div className="flex items-center gap-2">
+            <Icons.wallet className="w-6 h-6 text-primary" />
+            <h1 className="text-2xl font-bold text-text-primary">Dompet Saya</h1>
+          </div>
           <p className="text-text-secondary">Kelola semua dompet Anda</p>
         </div>
         <a
-          href="https://t.me/catatduitgalih_bot"
+          href="https://t.me/caborin_bot"
           target="_blank"
           className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors w-fit"
         >
-          <span>➕</span> Tambah via Telegram
+          <Icons.plus className="w-4 h-4" />
+          Tambah via Telegram
         </a>
       </div>
       
-      {/* Total Balance */}
       <div className="bg-gradient-to-br from-primary to-primary-light rounded-2xl p-6 text-white shadow-xl shadow-primary/30">
-        <p className="text-white/80">💵 Total Saldo Semua Dompet</p>
+        <div className="flex items-center gap-2 text-white/80">
+          <Icons.dollarSign className="w-5 h-5" />
+          <p>Total Saldo Semua Dompet</p>
+        </div>
         <p className="text-4xl font-bold mt-2">{formatCurrency(totalBalance)}</p>
         <p className="text-white/60 text-sm mt-2">{wallets.length} dompet terdaftar</p>
       </div>
       
-      {/* Wallet Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {sortedWallets.map((wallet, index) => (
           <div 
@@ -276,10 +280,10 @@ function WalletsPage({ wallets }: { wallets: any[] }) {
           >
             <div className="flex items-center justify-between mb-4">
               <div 
-                className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+                className="w-12 h-12 rounded-xl flex items-center justify-center"
                 style={{ backgroundColor: wallet.color_hex + '20' }}
               >
-                {wallet.icon || '💳'}
+                <Icons.creditCard className="w-6 h-6" style={{ color: wallet.color_hex }} />
               </div>
               <span className="text-xs font-medium px-2 py-1 bg-gray-100 rounded-full text-text-secondary">
                 #{index + 1}
@@ -293,7 +297,7 @@ function WalletsPage({ wallets }: { wallets: any[] }) {
       
       {wallets.length === 0 && (
         <div className="bg-card rounded-2xl p-8 text-center">
-          <span className="text-6xl mb-4 block">💳</span>
+          <Icons.creditCard className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <p className="text-text-secondary">Belum ada dompet</p>
           <p className="text-sm text-text-secondary mt-2">
             Gunakan perintah <code className="bg-gray-100 px-2 py-1 rounded">/addwallet [nama]</code> di Telegram
@@ -301,9 +305,10 @@ function WalletsPage({ wallets }: { wallets: any[] }) {
         </div>
       )}
       
-      <div className="bg-accent-blue/10 rounded-xl p-4 text-center">
+      <div className="bg-accent-blue/10 rounded-xl p-4 flex items-center gap-3">
+        <Icons.messageCircle className="w-5 h-5 text-accent-blue flex-shrink-0" />
         <p className="text-accent-blue text-sm">
-          💡 Gunakan perintah <code className="bg-white px-2 py-1 rounded">/addwallet [nama]</code> di Telegram untuk menambah dompet baru
+          Gunakan perintah <code className="bg-white px-2 py-1 rounded">/addwallet [nama]</code> di Telegram untuk menambah dompet baru
         </p>
       </div>
     </div>
@@ -314,31 +319,49 @@ function WalletsPage({ wallets }: { wallets: any[] }) {
 function AnalyticsPage({ analytics }: { analytics: Analytics }) {
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-text-primary">📈 Analisis Keuangan</h1>
+      <div className="flex items-center gap-2">
+        <Icons.pieChart className="w-6 h-6 text-primary" />
+        <h1 className="text-2xl font-bold text-text-primary">Analisis Keuangan</h1>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-card rounded-2xl p-5 shadow-card">
-          <p className="text-text-secondary text-sm">Total Pemasukan</p>
-          <p className="text-2xl font-bold text-primary mt-1">{formatCurrency(analytics.summary.totalIncome)}</p>
+          <div className="flex items-center gap-2 mb-2">
+            <Icons.arrowDown className="w-4 h-4 text-primary" />
+            <p className="text-text-secondary text-sm">Total Pemasukan</p>
+          </div>
+          <p className="text-2xl font-bold text-primary">{formatCurrency(analytics.summary.totalIncome)}</p>
         </div>
         <div className="bg-card rounded-2xl p-5 shadow-card">
-          <p className="text-text-secondary text-sm">Total Pengeluaran</p>
-          <p className="text-2xl font-bold text-accent-red mt-1">{formatCurrency(analytics.summary.totalExpense)}</p>
+          <div className="flex items-center gap-2 mb-2">
+            <Icons.arrowUp className="w-4 h-4 text-accent-red" />
+            <p className="text-text-secondary text-sm">Total Pengeluaran</p>
+          </div>
+          <p className="text-2xl font-bold text-accent-red">{formatCurrency(analytics.summary.totalExpense)}</p>
         </div>
         <div className="bg-card rounded-2xl p-5 shadow-card">
-          <p className="text-text-secondary text-sm">Net Income</p>
-          <p className={`text-2xl font-bold mt-1 ${analytics.summary.netIncome >= 0 ? 'text-primary' : 'text-accent-red'}`}>
+          <div className="flex items-center gap-2 mb-2">
+            <Icons.trendUp className="w-4 h-4 text-accent-blue" />
+            <p className="text-text-secondary text-sm">Net Income</p>
+          </div>
+          <p className={`text-2xl font-bold ${analytics.summary.netIncome >= 0 ? 'text-primary' : 'text-accent-red'}`}>
             {formatCurrency(analytics.summary.netIncome)}
           </p>
         </div>
         <div className="bg-card rounded-2xl p-5 shadow-card">
-          <p className="text-text-secondary text-sm">Rasio Tabungan</p>
-          <p className="text-2xl font-bold text-accent-blue mt-1">{analytics.summary.savingRatio.toFixed(1)}%</p>
+          <div className="flex items-center gap-2 mb-2">
+            <Icons.piggyBank className="w-4 h-4 text-accent-orange" />
+            <p className="text-text-secondary text-sm">Rasio Tabungan</p>
+          </div>
+          <p className="text-2xl font-bold text-accent-orange">{analytics.summary.savingRatio.toFixed(1)}%</p>
         </div>
       </div>
       
       <div className="bg-card rounded-2xl p-6 shadow-card">
-        <h3 className="font-semibold text-text-primary mb-4">🏷️ Breakdown Kategori</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <Icons.chart className="w-5 h-5 text-primary" />
+          <h3 className="font-semibold text-text-primary">Breakdown Kategori</h3>
+        </div>
         <div className="space-y-3">
           {analytics.categoryBreakdown.map((cat, index) => (
             <div key={index} className="flex items-center gap-3">
@@ -369,7 +392,10 @@ function HistoryPage({ transactions }: { transactions: Transaction[] }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-text-primary">📜 Riwayat Transaksi</h1>
+        <div className="flex items-center gap-2">
+          <Icons.history className="w-6 h-6 text-primary" />
+          <h1 className="text-2xl font-bold text-text-primary">Riwayat Transaksi</h1>
+        </div>
         
         <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
           {(['all', 'income', 'expense'] as const).map((f) => (
@@ -391,17 +417,21 @@ function HistoryPage({ transactions }: { transactions: Transaction[] }) {
       <div className="bg-card rounded-2xl shadow-card divide-y divide-gray-50">
         {filteredTx.length === 0 ? (
           <div className="p-8 text-center">
-            <span className="text-6xl mb-4 block">📝</span>
+            <Icons.receipt className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-text-secondary">Belum ada transaksi</p>
           </div>
         ) : (
           filteredTx.map((tx) => (
             <div key={tx.id} className="p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
               <div 
-                className="w-12 h-12 rounded-xl flex items-center justify-center text-lg"
+                className="w-12 h-12 rounded-xl flex items-center justify-center"
                 style={{ backgroundColor: (tx.category?.color_hex || '#7F8C8D') + '20' }}
               >
-                {tx.type === 'income' ? '💰' : '💸'}
+                {tx.type === 'income' ? (
+                  <Icons.arrowDown className="w-5 h-5 text-primary" />
+                ) : (
+                  <Icons.arrowUp className="w-5 h-5 text-accent-red" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-text-primary truncate">{tx.description}</p>
@@ -431,10 +461,16 @@ function HistoryPage({ transactions }: { transactions: Transaction[] }) {
 function SettingsPage({ telegramId, onLogout }: { telegramId: string | null; onLogout: () => void }) {
   return (
     <div className="space-y-6 max-w-2xl">
-      <h1 className="text-2xl font-bold text-text-primary">⚙️ Pengaturan</h1>
+      <div className="flex items-center gap-2">
+        <Icons.settings className="w-6 h-6 text-primary" />
+        <h1 className="text-2xl font-bold text-text-primary">Pengaturan</h1>
+      </div>
       
       <div className="bg-card rounded-2xl p-6 shadow-card">
-        <h3 className="font-semibold text-text-primary mb-4">👤 Akun</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <Icons.user className="w-5 h-5 text-primary" />
+          <h3 className="font-semibold text-text-primary">Akun</h3>
+        </div>
         <div className="space-y-4">
           <div className="flex items-center justify-between py-3 border-b border-gray-100">
             <span className="text-text-secondary">Telegram ID</span>
@@ -448,28 +484,35 @@ function SettingsPage({ telegramId, onLogout }: { telegramId: string | null; onL
       </div>
       
       <div className="bg-card rounded-2xl p-6 shadow-card">
-        <h3 className="font-semibold text-text-primary mb-4">🔗 Integrasi</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <Icons.telegram className="w-5 h-5 text-accent-blue" />
+          <h3 className="font-semibold text-text-primary">Integrasi</h3>
+        </div>
         <a
-          href="https://t.me/catatduitgalih_bot"
+          href="https://t.me/caborin_bot"
           target="_blank"
           className="flex items-center gap-3 p-4 bg-accent-blue/10 rounded-xl hover:bg-accent-blue/20 transition-colors"
         >
-          <span className="text-2xl">🤖</span>
+          <Icons.telegram className="w-8 h-8 text-accent-blue" />
           <div>
             <p className="font-medium text-text-primary">Telegram Bot</p>
-            <p className="text-sm text-text-secondary">@catatduitgalih_bot</p>
+            <p className="text-sm text-text-secondary">@caborin_bot</p>
           </div>
-          <span className="ml-auto text-accent-blue">→</span>
+          <Icons.chevronRight className="w-5 h-5 ml-auto text-accent-blue" />
         </a>
       </div>
       
       <div className="bg-card rounded-2xl p-6 shadow-card">
-        <h3 className="font-semibold text-text-primary mb-4">⚠️ Zona Bahaya</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <Icons.close className="w-5 h-5 text-accent-red" />
+          <h3 className="font-semibold text-text-primary">Zona Bahaya</h3>
+        </div>
         <button
           onClick={onLogout}
-          className="w-full py-3 bg-accent-red/10 text-accent-red font-medium rounded-xl hover:bg-accent-red/20 transition-colors"
+          className="w-full py-3 bg-accent-red/10 text-accent-red font-medium rounded-xl hover:bg-accent-red/20 transition-colors flex items-center justify-center gap-2"
         >
-          🚪 Keluar dari Akun
+          <Icons.logout className="w-4 h-4" />
+          Keluar dari Akun
         </button>
       </div>
     </div>

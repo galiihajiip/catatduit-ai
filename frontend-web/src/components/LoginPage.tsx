@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Icons } from './Icons'
 
 interface LoginPageProps {
   onLogin: (telegramId: string) => void
@@ -21,7 +22,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     setLoading(true)
     setError('')
     
-    // Simulate verification
     setTimeout(() => {
       localStorage.setItem('telegram_id', telegramId)
       localStorage.setItem('user_name', 'User')
@@ -36,15 +36,22 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-br from-primary to-primary-light rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-primary/30 mb-4">
-            <span className="text-4xl">💵</span>
+            <Icons.dollarSign className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-text-primary">CatatDuit</h1>
+          <h1 className="text-3xl font-bold text-text-primary">
+            <span className="text-primary">Catat</span>
+            <span className="text-accent-orange">.in</span>
+            <span className="text-text-primary"> Duit</span>
+          </h1>
           <p className="text-text-secondary mt-2">AI-Powered Finance Manager</p>
         </div>
 
         {/* Login Card */}
         <div className="bg-card rounded-2xl p-8 shadow-xl">
-          <h2 className="text-xl font-semibold text-text-primary mb-2">Selamat Datang! 👋</h2>
+          <div className="flex items-center gap-2 mb-2">
+            <Icons.user className="w-5 h-5 text-primary" />
+            <h2 className="text-xl font-semibold text-text-primary">Selamat Datang!</h2>
+          </div>
           <p className="text-text-secondary text-sm mb-6">
             Masuk dengan Telegram ID untuk melihat data keuangan Anda
           </p>
@@ -55,7 +62,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 Telegram ID
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">💬</span>
+                <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                  <Icons.telegram className="w-5 h-5 text-accent-blue" />
+                </div>
                 <input
                   type="text"
                   value={telegramId}
@@ -72,14 +81,18 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-primary to-primary-light text-white font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 shadow-lg shadow-primary/30"
+              className="w-full py-3 bg-gradient-to-r from-primary to-primary-light text-white font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 shadow-lg shadow-primary/30 flex items-center justify-center gap-2"
             >
               {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="animate-spin">⏳</span> Memverifikasi...
-                </span>
+                <>
+                  <Icons.refresh className="w-4 h-4 animate-spin" />
+                  Memverifikasi...
+                </>
               ) : (
-                'Masuk'
+                <>
+                  <Icons.logout className="w-4 h-4 rotate-180" />
+                  Masuk
+                </>
               )}
             </button>
           </form>
@@ -89,12 +102,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               Belum punya akun?
             </p>
             <a
-              href="https://t.me/catatduitgalih_bot"
+              href="https://t.me/caborin_bot"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-3 w-full py-3 bg-accent-blue/10 text-accent-blue font-medium rounded-xl hover:bg-accent-blue/20 transition-colors"
             >
-              <span className="text-xl">🤖</span>
+              <Icons.telegram className="w-5 h-5" />
               Daftar via Telegram Bot
             </a>
           </div>
@@ -102,9 +115,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
         {/* How to get ID */}
         <div className="mt-6 p-4 bg-card rounded-xl">
-          <h3 className="font-medium text-text-primary mb-2">💡 Cara mendapatkan Telegram ID:</h3>
-          <ol className="text-sm text-text-secondary space-y-1">
-            <li>1. Buka <a href="https://t.me/catatduitgalih_bot" target="_blank" className="text-primary hover:underline">@catatduitgalih_bot</a></li>
+          <div className="flex items-center gap-2 mb-2">
+            <Icons.messageCircle className="w-4 h-4 text-primary" />
+            <h3 className="font-medium text-text-primary">Cara mendapatkan Telegram ID:</h3>
+          </div>
+          <ol className="text-sm text-text-secondary space-y-1 ml-6">
+            <li>1. Buka <a href="https://t.me/caborin_bot" target="_blank" className="text-primary hover:underline">@caborin_bot</a></li>
             <li>2. Kirim perintah <code className="bg-gray-100 px-2 py-0.5 rounded">/start</code></li>
             <li>3. Bot akan mengirimkan Telegram ID Anda</li>
           </ol>
@@ -112,7 +128,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
         {/* Footer */}
         <p className="text-center text-text-secondary text-xs mt-6">
-          © 2025 CatatDuit. Kelola keuangan dengan AI.
+          © 2025 Catat.in Duit. Kelola keuangan dengan AI.
         </p>
       </div>
     </div>
