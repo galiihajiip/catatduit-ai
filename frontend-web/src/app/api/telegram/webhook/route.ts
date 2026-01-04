@@ -5,12 +5,15 @@ import { parseTransaction } from '@/lib/nlp'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY
 
-// Allow build to succeed without credentials
-const supabase = supabaseUrl && supabaseKey 
-  ? createClient(supabaseUrl, supabaseKey)
-  : null
+// Create client with fallback to prevent build errors
+const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseKey || 'placeholder-key'
+)
 
-if (!supabase) {
+const isConfigured = !!(supabaseUrl && supabaseKey)
+
+if (!isConfigured) {
   console.warn('Missing Supabase credentials - API will return empty data')
 }
 
@@ -114,8 +117,8 @@ function formatCurrency(amount: number): string {
 }
 
 export async function POST(request: NextRequest) {
-  // Return early if no Supabase connection
-  if (!supabase) {
+  // Return early if not configured
+  if (!isConfigured) {
     return NextResponse.json({ ok: true, message: 'Service unavailable' }, { status: 503 })
   }
   
