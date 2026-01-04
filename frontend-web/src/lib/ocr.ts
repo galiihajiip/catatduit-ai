@@ -240,16 +240,10 @@ function categorizeItem(itemName: string): string {
 }
 
 /**
- * Convert File to base64
+ * Convert File to base64 (Server-side compatible)
  */
 export async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const base64 = (reader.result as string).split(',')[1]
-      resolve(base64)
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
+  const bytes = await file.arrayBuffer()
+  const buffer = Buffer.from(bytes)
+  return buffer.toString('base64')
 }
