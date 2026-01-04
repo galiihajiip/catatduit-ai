@@ -1,0 +1,2 @@
+PASTE YOUR GOOGLE CLOUD VISION API KEY HERE
+Replace this text with your actual API key from Google Cloud Console

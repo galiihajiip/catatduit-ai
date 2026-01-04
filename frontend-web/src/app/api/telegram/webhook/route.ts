@@ -180,17 +180,15 @@ export async function POST(request: NextRequest) {
         const imageBuffer = await imageResponse.arrayBuffer()
         const base64Image = Buffer.from(imageBuffer).toString('base64')
         
-        // Process with OCR - MUST USE VISION API
-        const { processReceiptWithVision } = await import('@/lib/ocr')
-        
-        const hasVisionAPI = !!process.env.GOOGLE_CLOUD_VISION_API_KEY
+        // WORKAROUND: Use same API call as test endpoint that works
+        const apiKey = process.env.GOOGLE_CLOUD_VISION_API_KEY
         
         console.log('=== TELEGRAM OCR DEBUG ===')
-        console.log('Has Vision API Key:', hasVisionAPI)
+        console.log('Has Vision API Key:', !!apiKey)
         console.log('Image size:', imageBuffer.byteLength, 'bytes')
         console.log('Base64 length:', base64Image.length)
         
-        if (!hasVisionAPI) {
+        if (!apiKey) {
           console.error('❌ GOOGLE_CLOUD_VISION_API_KEY not set!')
           await sendMessage(chatId, '❌ OCR belum dikonfigurasi. Silakan hubungi admin.')
           return NextResponse.json({ ok: true })
@@ -198,17 +196,55 @@ export async function POST(request: NextRequest) {
         
         let receiptData
         try {
-          console.log('Calling Vision API...')
-          receiptData = await processReceiptWithVision(base64Image)
-          console.log('✅ Vision API success!')
+          console.log('Calling Vision API directly (same as test endpoint)...')
+          
+          // Call Vision API directly - same as test endpoint
+          const visionResponse = await fetch(
+            `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                requests: [{
+                  image: { content: base64Image },
+                  features: [{ type: 'TEXT_DETECTION' }]
+                }]
+              })
+            }
+          )
+          
+          console.log('Vision API response status:', visionResponse.status)
+          
+          const visionData = await visionResponse.json()
+          
+          if (!visionResponse.ok) {
+            console.error('Vision API error:', visionData)
+            throw new Error(`Vision API error: ${visionData.error?.message || 'Unknown error'}`)
+          }
+          
+          if (!visionData.responses || !visionData.responses[0]) {
+            throw new Error('No response from Vision API')
+          }
+          
+          if (!visionData.responses[0].textAnnotations || visionData.responses[0].textAnnotations.length === 0) {
+            throw new Error('No text detected in image')
+          }
+          
+          const rawText = visionData.responses[0].textAnnotations[0].description
+          console.log('✅ Text extracted, length:', rawText.length)
+          
+          // Parse the text
+          const { parseReceiptText } = await import('@/lib/ocr')
+          receiptData = parseReceiptText(rawText)
+          
+          console.log('✅ Parsing complete!')
           console.log('Merchant:', receiptData.merchant)
           console.log('Total:', receiptData.total)
           console.log('Items:', receiptData.items.length)
-          console.log('Confidence:', receiptData.confidence)
+          
         } catch (visionError: any) {
           console.error('❌ Vision API failed:', visionError)
           console.error('Error message:', visionError.message)
-          console.error('Error stack:', visionError.stack)
           
           await sendMessage(chatId, `❌ Gagal memproses struk.\n\n<b>Error:</b> ${visionError.message}\n\n<i>Silakan coba lagi atau ketik manual.</i>`)
           return NextResponse.json({ ok: true })

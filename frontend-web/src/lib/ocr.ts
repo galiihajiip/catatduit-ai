@@ -214,8 +214,9 @@ export async function processReceiptSimple(imageFile: File): Promise<ReceiptData
 
 /**
  * Parse extracted text to structured receipt data
+ * EXPORTED for use in Telegram webhook
  */
-function parseReceiptText(text: string): ReceiptData {
+export function parseReceiptText(text: string): ReceiptData {
   const lines = text.split('\n').filter(l => l.trim())
   const textLower = text.toLowerCase()
   
