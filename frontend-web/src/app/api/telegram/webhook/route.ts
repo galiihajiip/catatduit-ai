@@ -135,18 +135,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
     
-    if (!update.message?.text) {
+    if (!update.message) {
       return NextResponse.json({ ok: true })
     }
     
-    const chatId = update.message.chat.id
-    const text = update.message.text.trim()
-    const userName = update.message.from?.first_name || 'User'
+    const message = update.message
+    const chatId = message.chat.id
+    const userName = message.from?.first_name || 'User'
     
     // Get or create user
     const user = await getOrCreateUser(String(chatId), userName)
     if (!user) {
       await sendMessage(chatId, '❌ Error: Gagal membuat user')
+      return NextResponse.json({ ok: true })
+    }
+
+    // Handle photo messages
+    if (message.photo) {
+      await sendMessage(chatId, `
+📸 <b>Scan Struk via Foto</b>
+
+Untuk scan struk belanja, silakan gunakan:
+🌐 <b>Web Dashboard</b>
+
+<b>Cara:</b>
+1. Buka: https://your-app.vercel.app
+2. Login dengan Telegram ID: <code>${chatId}</code>
+3. Klik tombol kamera (kanan bawah)
+4. Upload/foto struk
+5. Transaksi otomatis tercatat!
+
+<i>Atau ketik manual: "beli bakso 15rb"</i>
+      `)
+      return NextResponse.json({ ok: true })
+    }
+
+    const text = message.text?.trim()
+    if (!text) {
       return NextResponse.json({ ok: true })
     }
 
