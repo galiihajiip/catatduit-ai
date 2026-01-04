@@ -4,14 +4,24 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase credentials')
+const isConfigured = !!(supabaseUrl && supabaseKey)
+
+if (!isConfigured) {
+  console.warn('Missing Supabase credentials - API will return empty data')
 }
 
-const supabase = createClient(supabaseUrl || '', supabaseKey || '')
+// Create client with fallback
+const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseKey || 'placeholder-key'
+)
 
 // GET - List wallets
 export async function GET(request: NextRequest) {
+  if (!isConfigured) {
+    return NextResponse.json({ wallets: [] })
+  }
+  
   const { searchParams } = new URL(request.url)
   const telegramId = searchParams.get('telegram_id')
   
@@ -40,6 +50,10 @@ export async function GET(request: NextRequest) {
 
 // POST - Create wallet
 export async function POST(request: NextRequest) {
+  if (!isConfigured) {
+    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
+  }
+  
   try {
     const body = await request.json()
     const { telegram_id, name, balance = 0, color_hex = '#16A085', icon = 'wallet' } = body
@@ -94,6 +108,10 @@ export async function POST(request: NextRequest) {
 
 // PUT - Update wallet (balance, name, etc)
 export async function PUT(request: NextRequest) {
+  if (!isConfigured) {
+    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
+  }
+  
   try {
     const body = await request.json()
     const { telegram_id, wallet_id, name, balance, color_hex, icon } = body
@@ -150,6 +168,10 @@ export async function PUT(request: NextRequest) {
 
 // DELETE - Delete wallet
 export async function DELETE(request: NextRequest) {
+  if (!isConfigured) {
+    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
+  }
+  
   const { searchParams } = new URL(request.url)
   const telegramId = searchParams.get('telegram_id')
   const walletId = searchParams.get('wallet_id')
