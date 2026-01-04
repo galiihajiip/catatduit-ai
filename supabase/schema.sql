@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     description TEXT,
     raw_input TEXT,
     ai_confidence DECIMAL(3,2),
+    receipt_image_path TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

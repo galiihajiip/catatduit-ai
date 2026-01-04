@@ -44,6 +44,14 @@ Bot:  ✅ Tercatat! Pemasukan Rp 5.000.000 - Gaji
 
 Kamu: "abis 50k buat ngopi sama temen"
 Bot:  ✅ Tercatat! Pengeluaran Rp 50.000 untuk Makanan
+
+Kamu: [Kirim foto struk Alfamart]
+Bot:  📸 Memproses struk... 
+      ✅ Struk berhasil diproses!
+      🏪 Merchant: Alfamart
+      💰 Total: Rp 125.000
+      📦 5 items tercatat
+      Saldo dompet diperbarui!
 ```
 
 ## ✨ Fitur
@@ -53,6 +61,13 @@ Bot:  ✅ Tercatat! Pengeluaran Rp 50.000 untuk Makanan
 - **Auto-Kategorisasi** - Otomatis mendeteksi kategori dari konteks
 - **Multi-Wallet Detection** - Deteksi otomatis metode pembayaran
 - **Confidence Scoring** - Sistem kepercayaan untuk akurasi tinggi
+
+### 📸 OCR Receipt Scanner (NEW!)
+- **Upload Foto Struk** - Upload foto struk dari galeri
+- **Real-time Camera** - Ambil foto struk langsung dari kamera
+- **Auto-Extract Data** - AI ekstrak merchant, total, dan items otomatis
+- **Smart Categorization** - Kategorisasi otomatis berdasarkan items
+- **Instant Recording** - Transaksi langsung tercatat dan saldo terupdate
 
 ### 📊 Dashboard Analytics
 - **Real-time Summary** - Total pemasukan, pengeluaran, dan net income

@@ -35,6 +35,10 @@ async def telegram_webhook(update: dict, db: AsyncSession = Depends(get_db)):
     # Get or create user
     user = await get_or_create_user(db, str(chat_id), user_info.get("first_name", "User"))
     
+    # Handle photo messages (receipt scan)
+    if "photo" in message:
+        return await handle_photo(message, chat_id, user, db)
+    
     # Handle commands
     if text.startswith("/"):
         return await handle_command(text, chat_id, user, db)
@@ -215,3 +219,126 @@ async def save_transaction(db: AsyncSession, user: User, parsed) -> None:
         description=parsed.description,
         ai_confidence=parsed.confidence
     )
+
+
+async def handle_photo(message: dict, chat_id: int, user: User, db: AsyncSession):
+    """Handle photo messages for receipt scanning"""
+    try:
+        # Get the largest photo
+        photos = message["photo"]
+        largest_photo = max(photos, key=lambda p: p["file_size"])
+        file_id = largest_photo["file_id"]
+        
+        # Send processing message
+        await TelegramService.send_message(chat_id, "📸 Memproses struk... Mohon tunggu sebentar.")
+        
+        # Download photo
+        photo_bytes = await TelegramService.download_photo(file_id)
+        if not photo_bytes:
+            await TelegramService.send_message(chat_id, "❌ Gagal mengunduh foto. Silakan coba lagi.")
+            return {"ok": True}
+        
+        # Save photo temporarily
+        import os
+        import uuid
+        from app.ai.ocr_engine import ocr_engine
+        
+        if not ocr_engine:
+            await TelegramService.send_message(
+                chat_id, 
+                "❌ Fitur scan struk belum tersedia. Silakan ketik manual."
+            )
+            return {"ok": True}
+        
+        upload_dir = "uploads/receipts"
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        file_id_str = str(uuid.uuid4())
+        file_path = os.path.join(upload_dir, f"{file_id_str}.jpg")
+        
+        with open(file_path, "wb") as f:
+            f.write(photo_bytes)
+        
+        # Process with OCR
+        receipt_data = ocr_engine.process_image(file_path)
+        
+        if receipt_data.total_amount > 0:
+            # Get wallet
+            result = await db.execute(
+                select(Wallet).where(Wallet.user_id == user.id).limit(1)
+            )
+            wallet = result.scalar_one_or_none()
+            
+            if not wallet:
+                wallet = Wallet(user_id=user.id, name="Cash", balance=0)
+                db.add(wallet)
+                await db.commit()
+                await db.refresh(wallet)
+            
+            # Get category
+            result = await db.execute(
+                select(Category).where(Category.name == "Belanja")
+            )
+            category = result.scalar_one_or_none()
+            
+            if not category:
+                result = await db.execute(
+                    select(Category).where(Category.name == "Lainnya")
+                )
+                category = result.scalar_one_or_none()
+            
+            # Create transaction
+            from app.models.models import Transaction
+            transaction = Transaction(
+                user_id=user.id,
+                wallet_id=wallet.id,
+                category_id=category.id if category else None,
+                type=TransactionType.EXPENSE,
+                amount=receipt_data.total_amount,
+                description=f"Belanja di {receipt_data.merchant_name or 'Toko'}" + 
+                           (f" - {len(receipt_data.items)} items" if receipt_data.items else ""),
+                raw_input=f"OCR: {receipt_data.raw_text[:100]}...",
+                ai_confidence=receipt_data.confidence,
+                receipt_image_path=file_path
+            )
+            
+            db.add(transaction)
+            wallet.balance -= receipt_data.total_amount
+            await db.commit()
+            await db.refresh(transaction)
+            
+            # Send result
+            await TelegramService.send_receipt_result(
+                chat_id,
+                {
+                    "merchant": receipt_data.merchant_name,
+                    "total": receipt_data.total_amount,
+                    "items": [
+                        {
+                            "name": item.name,
+                            "quantity": item.quantity,
+                            "price": item.price
+                        }
+                        for item in receipt_data.items
+                    ],
+                    "confidence": receipt_data.confidence
+                },
+                {
+                    "new_balance": wallet.balance
+                }
+            )
+        else:
+            await TelegramService.send_message(
+                chat_id,
+                "❌ Tidak dapat membaca total dari struk. Silakan foto ulang dengan lebih jelas atau ketik manual."
+            )
+        
+        return {"ok": True}
+        
+    except Exception as e:
+        print(f"Error handling photo: {e}")
+        await TelegramService.send_message(
+            chat_id,
+            "❌ Terjadi kesalahan saat memproses foto. Silakan coba lagi."
+        )
+        return {"ok": True}

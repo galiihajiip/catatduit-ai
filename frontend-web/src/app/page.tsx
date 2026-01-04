@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Sidebar, { HamburgerButton } from '@/components/Sidebar'
 import Dashboard from '@/components/Dashboard'
 import LoginPage from '@/components/LoginPage'
+import ReceiptScanner from '@/components/ReceiptScanner'
 import { UpgradeModal } from '@/components/ProBadge'
 import { Icons } from '@/components/Icons'
 import { formatCurrency } from '@/lib/utils'
@@ -234,6 +235,14 @@ export default function Home() {
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
       />
+      
+      {/* Receipt Scanner FAB */}
+      {isLoggedIn && telegramId && (
+        <ReceiptScanner 
+          telegramId={telegramId} 
+          onSuccess={() => fetchData(telegramId)}
+        />
+      )}
     </div>
   )
 }

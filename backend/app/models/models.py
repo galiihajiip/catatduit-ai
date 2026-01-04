@@ -65,6 +65,7 @@ class Transaction(Base):
     description = Column(Text, nullable=True)
     raw_input = Column(Text, nullable=True)
     ai_confidence = Column(Float, nullable=True)
+    receipt_image_path = Column(String(255), nullable=True)  # Path to receipt image
     created_at = Column(DateTime, default=datetime.utcnow)
     
     user = relationship("User", back_populates="transactions")

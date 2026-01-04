@@ -146,3 +146,56 @@ Transaksi berikut telah dihapus:
 📄 {transaction['description']}
 """
         return await cls.send_message(chat_id, text)
+
+    @classmethod
+    async def download_photo(cls, file_id: str) -> Optional[bytes]:
+        """Download photo from Telegram"""
+        try:
+            async with httpx.AsyncClient() as client:
+                # Get file path
+                response = await client.get(f"{cls.BASE_URL}/getFile?file_id={file_id}")
+                if response.status_code != 200:
+                    return None
+                
+                data = response.json()
+                if not data.get('ok'):
+                    return None
+                
+                file_path = data['result']['file_path']
+                
+                # Download file
+                file_url = f"https://api.telegram.org/file/bot{settings.TELEGRAM_BOT_TOKEN}/{file_path}"
+                file_response = await client.get(file_url)
+                
+                if file_response.status_code == 200:
+                    return file_response.content
+                
+                return None
+        except Exception as e:
+            print(f"Error downloading photo: {e}")
+            return None
+    
+    @classmethod
+    async def send_receipt_result(cls, chat_id: int, receipt_data: dict, transaction_data: dict) -> bool:
+        """Send receipt scan result"""
+        items_text = ""
+        if receipt_data.get('items'):
+            items_text = "\n\n📦 <b>Items:</b>\n"
+            for item in receipt_data['items'][:5]:  # Show max 5 items
+                items_text += f"• {item['name']} - Rp {item['price']:,.0f}\n"
+            if len(receipt_data['items']) > 5:
+                items_text += f"... dan {len(receipt_data['items']) - 5} item lainnya\n"
+        
+        text = f"""
+📸 <b>Struk Berhasil Diproses!</b>
+
+🏪 <b>Merchant:</b> {receipt_data.get('merchant', 'Unknown')}
+💰 <b>Total:</b> Rp {receipt_data['total']:,.0f}
+📊 <b>Confidence:</b> {receipt_data['confidence']*100:.0f}%
+{items_text}
+✅ Transaksi telah dicatat dan saldo dompet diperbarui.
+💳 <b>Saldo Baru:</b> Rp {transaction_data['new_balance']:,.0f}
+
+Ketik /wallets untuk lihat semua dompet.
+"""
+        return await cls.send_message(chat_id, text)

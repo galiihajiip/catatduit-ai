@@ -6,7 +6,7 @@ import logging
 
 from app.core.config import settings
 from app.db.database import init_db
-from app.api.routes import telegram, transactions, analytics, wallets, categories
+from app.api.routes import telegram, transactions, analytics, wallets, categories, ocr
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -44,6 +44,7 @@ app.include_router(transactions.router)
 app.include_router(analytics.router)
 app.include_router(wallets.router)
 app.include_router(categories.router)
+app.include_router(ocr.router)
 
 @app.get("/")
 async def root():
