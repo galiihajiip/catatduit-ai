@@ -68,6 +68,8 @@ Bot:  📸 Memproses struk...
 - **Auto-Extract Data** - AI ekstrak merchant, total, dan items otomatis
 - **Smart Categorization** - Kategorisasi otomatis berdasarkan items
 - **Instant Recording** - Transaksi langsung tercatat dan saldo terupdate
+- **Works Offline** - Mode simple tanpa perlu API key (demo mode)
+- **Upgrade to Vision API** - Akurasi tinggi dengan Google Cloud Vision (optional)
 
 ### 📊 Dashboard Analytics
 - **Real-time Summary** - Total pemasukan, pengeluaran, dan net income

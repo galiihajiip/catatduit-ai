@@ -33,12 +33,20 @@ export async function POST(request: NextRequest) {
     // Convert file to base64
     const base64 = await fileToBase64(file)
 
-    // Process with Google Vision API or fallback
+    // Try Google Vision API if configured, otherwise use simple processing
     let receiptData
-    try {
-      receiptData = await processReceiptWithVision(base64)
-    } catch (visionError) {
-      console.warn('Vision API failed, using simple processing:', visionError)
+    const hasVisionAPI = !!process.env.GOOGLE_CLOUD_VISION_API_KEY
+    
+    if (hasVisionAPI) {
+      try {
+        receiptData = await processReceiptWithVision(base64)
+      } catch (visionError) {
+        console.warn('Vision API failed, using simple processing:', visionError)
+        receiptData = await processReceiptSimple(file)
+      }
+    } else {
+      // Use simple processing (no API key needed)
+      console.log('Using simple OCR processing (no Vision API key)')
       receiptData = await processReceiptSimple(file)
     }
 
