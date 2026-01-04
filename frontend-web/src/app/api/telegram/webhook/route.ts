@@ -150,24 +150,145 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // Handle photo messages
+    // Handle photo messages - PROCESS WITH OCR
     if (message.photo) {
-      await sendMessage(chatId, `
-📸 <b>Scan Struk via Foto</b>
+      try {
+        await sendMessage(chatId, '📸 Memproses struk... Mohon tunggu sebentar.')
+        
+        // Get the largest photo
+        const photos = message.photo
+        const largestPhoto = photos.reduce((prev: any, current: any) => 
+          (current.file_size > prev.file_size) ? current : prev
+        )
+        
+        // Download photo from Telegram
+        const fileResponse = await fetch(
+          `https://api.telegram.org/bot${TELEGRAM_TOKEN}/getFile?file_id=${largestPhoto.file_id}`
+        )
+        const fileData = await fileResponse.json()
+        
+        if (!fileData.ok) {
+          await sendMessage(chatId, '❌ Gagal mengunduh foto. Silakan coba lagi.')
+          return NextResponse.json({ ok: true })
+        }
+        
+        const filePath = fileData.result.file_path
+        const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${filePath}`
+        
+        // Download image
+        const imageResponse = await fetch(fileUrl)
+        const imageBuffer = await imageResponse.arrayBuffer()
+        const base64Image = Buffer.from(imageBuffer).toString('base64')
+        
+        // Process with OCR (same as web)
+        const { processReceiptWithVision, processReceiptSimple } = await import('@/lib/ocr')
+        
+        let receiptData
+        const hasVisionAPI = !!process.env.GOOGLE_CLOUD_VISION_API_KEY
+        
+        if (hasVisionAPI) {
+          try {
+            receiptData = await processReceiptWithVision(base64Image)
+          } catch (visionError) {
+            console.warn('Vision API failed, using simple processing')
+            // Create a mock File object for simple processing
+            const blob = new Blob([Buffer.from(imageBuffer)])
+            const file = new File([blob], 'receipt.jpg', { type: 'image/jpeg' })
+            receiptData = await processReceiptSimple(file)
+          }
+        } else {
+          const blob = new Blob([Buffer.from(imageBuffer)])
+          const file = new File([blob], 'receipt.jpg', { type: 'image/jpeg' })
+          receiptData = await processReceiptSimple(file)
+        }
+        
+        if (receiptData.total === 0) {
+          await sendMessage(chatId, '❌ Tidak dapat membaca total dari struk. Silakan foto ulang dengan lebih jelas atau ketik manual.')
+          return NextResponse.json({ ok: true })
+        }
+        
+        // Get wallet
+        const { data: wallet } = await supabase
+          .from('wallets')
+          .select('*')
+          .eq('user_id', user.id)
+          .limit(1)
+          .single()
+        
+        if (!wallet) {
+          await sendMessage(chatId, '❌ Wallet tidak ditemukan. Ketik /start untuk setup.')
+          return NextResponse.json({ ok: true })
+        }
+        
+        // Get category
+        const { data: category } = await supabase
+          .from('categories')
+          .select('id')
+          .eq('name', 'Belanja')
+          .single()
+        
+        // Create transaction
+        const { data: transaction, error: txError } = await supabase
+          .from('transactions')
+          .insert({
+            user_id: user.id,
+            wallet_id: wallet.id,
+            category_id: category?.id,
+            type: 'expense',
+            amount: receiptData.total,
+            description: `Belanja di ${receiptData.merchant || 'Toko'}${
+              receiptData.items.length > 0 ? ` - ${receiptData.items.length} items` : ''
+            }`,
+            raw_input: `OCR Telegram: ${receiptData.rawText.substring(0, 100)}...`,
+            ai_confidence: receiptData.confidence
+          })
+          .select()
+          .single()
+        
+        if (txError) {
+          console.error('Transaction error:', txError)
+          await sendMessage(chatId, '❌ Gagal menyimpan transaksi.')
+          return NextResponse.json({ ok: true })
+        }
+        
+        // Update wallet balance
+        const newBalance = wallet.balance - receiptData.total
+        await supabase
+          .from('wallets')
+          .update({ balance: newBalance })
+          .eq('id', wallet.id)
+        
+        // Send success message with details
+        let itemsText = ''
+        if (receiptData.items.length > 0) {
+          itemsText = '\n\n📦 <b>Items:</b>\n'
+          receiptData.items.slice(0, 5).forEach((item: any) => {
+            itemsText += `• ${item.name} - Rp ${item.price.toLocaleString('id-ID')}\n`
+          })
+          if (receiptData.items.length > 5) {
+            itemsText += `... dan ${receiptData.items.length - 5} item lainnya\n`
+          }
+        }
+        
+        await sendMessage(chatId, `
+✅ <b>Struk Berhasil Diproses!</b>
 
-Untuk scan struk belanja, silakan gunakan:
-🌐 <b>Web Dashboard</b>
+${receiptData.merchant ? `🏪 <b>Merchant:</b> ${receiptData.merchant}\n` : ''}💰 <b>Total:</b> Rp ${receiptData.total.toLocaleString('id-ID')}
+📊 <b>Confidence:</b> ${(receiptData.confidence * 100).toFixed(0)}%
+${itemsText}
+✅ Transaksi telah dicatat
+💳 <b>Saldo ${wallet.name}:</b> Rp ${newBalance.toLocaleString('id-ID')}
 
-<b>Cara:</b>
-1. Buka: https://your-app.vercel.app
-2. Login dengan Telegram ID: <code>${chatId}</code>
-3. Klik tombol kamera (kanan bawah)
-4. Upload/foto struk
-5. Transaksi otomatis tercatat!
-
-<i>Atau ketik manual: "beli bakso 15rb"</i>
-      `)
-      return NextResponse.json({ ok: true })
+Ketik /today untuk lihat ringkasan hari ini.
+        `)
+        
+        return NextResponse.json({ ok: true })
+        
+      } catch (error: any) {
+        console.error('Photo processing error:', error)
+        await sendMessage(chatId, `❌ Terjadi kesalahan saat memproses foto.\n\n<i>Atau ketik manual: "beli bakso 15rb"</i>`)
+        return NextResponse.json({ ok: true })
+      }
     }
 
     const text = message.text?.trim()
