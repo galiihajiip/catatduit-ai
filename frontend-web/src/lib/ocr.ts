@@ -27,9 +27,9 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   "Belanja": ["baju", "celana", "sepatu", "tas"],
 }
 
-// Merchant patterns - EXPANDED
+// Merchant patterns - COMPREHENSIVE
 const MERCHANT_PATTERNS = [
-  // Minimarket
+  // Minimarket & Supermarket
   /indomaret/i,
   /alfamart/i,
   /alfa\s*mart/i,
@@ -40,6 +40,8 @@ const MERCHANT_PATTERNS = [
   /lotte\s*mart/i,
   /superindo/i,
   /ranch\s*market/i,
+  /transmart/i,
+  /yogya/i,
   
   // Fast Food
   /mcd|mcdonald|mc\s*donald/i,
@@ -49,6 +51,21 @@ const MERCHANT_PATTERNS = [
   /domino/i,
   /wendy/i,
   /a&w/i,
+  /texas\s*chicken/i,
+  /richeese/i,
+  /hoka\s*hoka\s*bento/i,
+  /yoshinoya/i,
+  /pepper\s*lunch/i,
+  
+  // Bakery & Pastry
+  /breadtalk/i,
+  /bread\s*talk/i,
+  /bread\s*life/i,
+  /breadlife/i,
+  /holland\s*bakery/i,
+  /bake\s*culture/i,
+  /tous\s*les\s*jours/i,
+  /paris\s*baguette/i,
   
   // Coffee & Cafe
   /starbucks/i,
@@ -57,13 +74,27 @@ const MERCHANT_PATTERNS = [
   /fore\s*coffee/i,
   /kopi\s*tuku/i,
   /excelso/i,
+  /coffee\s*bean/i,
+  /dunkin/i,
+  /j\.?co/i,
   
   // Restaurant
   /solaria/i,
-  /hoka\s*hoka\s*bento/i,
-  /yoshinoya/i,
-  /pepper\s*lunch/i,
   /bakmi\s*gm/i,
+  /warunk\s*upnormal/i,
+  /sushi\s*tei/i,
+  /genki\s*sushi/i,
+  /ichiban\s*sushi/i,
+  /hokben/i,
+  /sabana/i,
+  /es\s*teler\s*77/i,
+  
+  // Pharmacy & Health
+  /guardian/i,
+  /watsons/i,
+  /century/i,
+  /kimia\s*farma/i,
+  /apotek/i,
 ]
 
 /**
@@ -173,64 +204,110 @@ function parseReceiptText(text: string): ReceiptData {
   console.log('Total lines:', lines.length)
   console.log('First 300 chars:', text.substring(0, 300))
   
-  // Extract merchant - IMPROVED
+  // Extract merchant - IMPROVED WITH SCORING
   let merchant: string | null = null
+  let bestScore = 0
   
-  // Try exact patterns first
+  // Try exact patterns first with scoring
   for (const pattern of MERCHANT_PATTERNS) {
     const match = text.match(pattern)
     if (match) {
-      merchant = match[0].trim()
-      // Capitalize properly
-      merchant = merchant.split(' ').map(w => 
-        w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
-      ).join(' ')
-      console.log('Merchant found (pattern):', merchant)
-      break
-    }
-  }
-  
-  // If no merchant found, check first 3 lines for store name
-  if (!merchant) {
-    for (let i = 0; i < Math.min(3, lines.length); i++) {
-      const line = lines[i].trim()
-      // Store name usually: 3-30 chars, mostly letters, at top
-      if (line.length >= 3 && line.length <= 30 && /[a-z]/i.test(line)) {
-        // Skip if it's a number or address
-        if (!/^\d+$/.test(line) && !/jl\.|jalan|street|no\./i.test(line)) {
-          merchant = line
-          console.log('Merchant found (first lines):', merchant)
-          break
-        }
+      const matchedText = match[0].trim()
+      const matchIndex = text.indexOf(matchedText)
+      
+      // Score based on position (earlier = better) and length
+      let score = 100
+      if (matchIndex < 100) score += 50 // Very early in text
+      else if (matchIndex < 300) score += 30 // Early in text
+      score += matchedText.length * 2 // Longer match = more specific
+      
+      if (score > bestScore) {
+        bestScore = score
+        merchant = matchedText
+        // Capitalize properly
+        merchant = merchant.split(' ').map(w => 
+          w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+        ).join(' ')
       }
     }
   }
   
-  // Extract total amount - IMPROVED LOGIC
-  let total = 0
-  const totalPatterns = [
-    // Most common patterns
-    /(?:total|grand\s*total|jumlah|bayar|dibayar)\s*:?\s*rp\.?\s*([\d.,]+)/i,
-    /(?:total|grand\s*total)\s*:?\s*([\d.,]+)/i,
-    // Look for "total" followed by number within 20 chars
-    /total[\s\S]{0,20}?([\d.,]{5,})/i,
-    // Just "Rp" followed by large number at end of line
-    /rp\.?\s*([\d.,]{5,})\s*$/im,
-  ]
+  if (merchant) {
+    console.log('Merchant found (pattern):', merchant, 'score:', bestScore)
+  }
   
-  for (const pattern of totalPatterns) {
-    const match = text.match(pattern)
-    if (match) {
-      const amountStr = match[1]
-      total = parseAmount(amountStr)
-      if (total > 0) {
-        console.log('Total found with pattern:', pattern.source.substring(0, 50), '→', total)
+  // If no merchant found, check first 5 lines for store name
+  if (!merchant) {
+    for (let i = 0; i < Math.min(5, lines.length); i++) {
+      const line = lines[i].trim()
+      
+      // Store name validation:
+      // - Length: 3-40 chars
+      // - Must contain letters
+      // - Not just numbers
+      // - Not address/phone/date
+      const isValidLength = line.length >= 3 && line.length <= 40
+      const hasLetters = /[a-z]/i.test(line)
+      const notJustNumbers = !/^\d+$/.test(line)
+      const notAddress = !/jl\.|jalan|street|no\.|telp|phone|fax/i.test(line)
+      const notDate = !/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(line)
+      const notBarcode = !/^[\d\*\#\-]{8,}$/.test(line)
+      
+      // Skip common header words
+      const skipWords = ['struk', 'nota', 'invoice', 'receipt', 'bill', 'kasir', 'cashier']
+      const notSkipWord = !skipWords.some(word => line.toLowerCase().includes(word))
+      
+      if (isValidLength && hasLetters && notJustNumbers && notAddress && notDate && notBarcode && notSkipWord) {
+        merchant = line
+        console.log('Merchant found (line', i + 1, '):', merchant)
         break
       }
     }
   }
   
-  // Fallback: Find largest reasonable number
+  // Extract total amount - IMPROVED WITH CONTEXT SCORING
+  let total = 0
+  let bestTotalScore = 0
+  
+  const totalPatterns = [
+    // Most reliable: explicit "total" keyword
+    { pattern: /(?:total|grand\s*total)\s*:?\s*rp\.?\s*([\d.,]+)/i, score: 100 },
+    { pattern: /(?:jumlah|bayar|dibayar)\s*:?\s*rp\.?\s*([\d.,]+)/i, score: 90 },
+    
+    // Medium reliability: "total" near number
+    { pattern: /total[\s\S]{0,15}?([\d.,]{5,})/i, score: 70 },
+    
+    // Lower reliability: just "Rp" with large number
+    { pattern: /rp\.?\s*([\d.,]{5,})\s*$/im, score: 50 },
+  ]
+  
+  for (const { pattern, score } of totalPatterns) {
+    const match = text.match(pattern)
+    if (match) {
+      const amountStr = match[1]
+      const amount = parseAmount(amountStr)
+      
+      // Validate amount is reasonable for receipt (1k - 10M)
+      if (amount >= 1000 && amount <= 10000000) {
+        // Additional scoring based on context
+        let contextScore = score
+        
+        // Boost score if found in last 30% of text (totals usually at bottom)
+        const matchPos = text.indexOf(match[0])
+        if (matchPos > text.length * 0.7) {
+          contextScore += 20
+        }
+        
+        if (contextScore > bestTotalScore) {
+          bestTotalScore = contextScore
+          total = amount
+          console.log('Total candidate:', amount, 'score:', contextScore, 'pattern:', pattern.source.substring(0, 40))
+        }
+      }
+    }
+  }
+  
+  // Fallback: Find largest reasonable number (only if no total found)
   if (total === 0) {
     const allNumbers = text.match(/[\d.,]{4,}/g) || []
     const amounts = allNumbers
@@ -239,9 +316,31 @@ function parseReceiptText(text: string): ReceiptData {
       .sort((a, b) => b - a) // Sort descending
     
     if (amounts.length > 0) {
-      total = amounts[0] // Take largest
-      console.log('Using largest number as total:', total, 'from', amounts.length, 'candidates')
+      // Take largest, but prefer numbers in bottom half of text
+      const textLines = text.split('\n')
+      const bottomHalfStart = Math.floor(textLines.length / 2)
+      
+      for (const amount of amounts) {
+        const amountStr = amount.toString()
+        const lineIndex = textLines.findIndex(line => line.includes(amountStr))
+        
+        if (lineIndex >= bottomHalfStart) {
+          total = amount
+          console.log('Using largest number from bottom half:', total)
+          break
+        }
+      }
+      
+      // If still no total, just use largest
+      if (total === 0) {
+        total = amounts[0]
+        console.log('Using largest number as fallback:', total)
+      }
     }
+  }
+  
+  if (total > 0) {
+    console.log('Final total:', total, 'score:', bestTotalScore)
   }
   
   // Extract items - IMPROVED
