@@ -150,14 +150,17 @@ Input: "abis 50k buat ngopi pake ovo"
 - Node.js 18+
 - PostgreSQL / Supabase account
 - Telegram Bot Token
+- Google Cloud Vision API Key (optional)
 
-### 1. Clone Repository
+### Local Development
+
+#### 1. Clone Repository
 ```bash
 git clone https://github.com/yourusername/catatduit-ai.git
 cd catatduit-ai
 ```
 
-### 2. Setup Backend
+#### 2. Setup Backend
 ```bash
 cd backend
 python -m venv venv
@@ -169,7 +172,7 @@ cp .env.example .env
 # Edit .env dengan credentials kamu
 ```
 
-### 3. Setup Frontend
+#### 3. Setup Frontend
 ```bash
 cd frontend-web
 npm install
@@ -179,13 +182,13 @@ cp .env.example .env.local
 # Edit .env.local dengan Supabase credentials
 ```
 
-### 4. Setup Database
+#### 4. Setup Database
 ```sql
 -- Jalankan di Supabase SQL Editor
 -- File: supabase/schema.sql
 ```
 
-### 5. Run Development
+#### 5. Run Development
 ```bash
 # Terminal 1 - Backend
 cd backend
@@ -196,10 +199,32 @@ cd frontend-web
 npm run dev
 ```
 
-### 6. Setup Telegram Webhook
+### Production Deployment
+
+#### Deploy Frontend to Vercel
 ```bash
-curl -X POST "https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook?url=https://yourdomain.com/api/telegram/webhook"
+# Push to GitHub, then:
+# 1. Import project to Vercel
+# 2. Add environment variables
+# 3. Deploy
 ```
+
+See: [Vercel Deployment Guide](https://vercel.com/docs)
+
+#### Deploy Backend to Railway
+```bash
+# 1. Sign up at railway.app
+# 2. New Project → Deploy from GitHub
+# 3. Select backend folder
+# 4. Add environment variables
+# 5. Deploy
+```
+
+See: [docs/DEPLOY_BACKEND.md](docs/DEPLOY_BACKEND.md) for complete guide.
+
+#### Setup OCR
+- **Google Vision API**: [docs/DEPLOY_OCR.md](docs/DEPLOY_OCR.md)
+- **Tesseract (Railway)**: Auto-installed ✅
 
 ## 🐳 Docker Deployment
 
