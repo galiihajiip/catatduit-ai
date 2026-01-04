@@ -107,6 +107,9 @@ export async function processReceiptWithVision(imageBase64: string): Promise<Rec
     throw new Error('Google Cloud Vision API key not configured')
   }
 
+  console.log('Vision API: Starting request...')
+  console.log('Vision API: Image size:', imageBase64.length, 'chars')
+
   try {
     const response = await fetch(
       `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
@@ -122,17 +125,33 @@ export async function processReceiptWithVision(imageBase64: string): Promise<Rec
       }
     )
 
+    console.log('Vision API: Response status:', response.status)
+
     const data = await response.json()
     
-    if (!data.responses || !data.responses[0].textAnnotations) {
+    if (!response.ok) {
+      console.error('Vision API: Error response:', data)
+      throw new Error(`Vision API error: ${data.error?.message || 'Unknown error'}`)
+    }
+    
+    if (!data.responses || !data.responses[0]) {
+      console.error('Vision API: No responses in data')
+      throw new Error('No response from Vision API')
+    }
+    
+    if (!data.responses[0].textAnnotations || data.responses[0].textAnnotations.length === 0) {
+      console.warn('Vision API: No text detected in image')
       throw new Error('No text detected in image')
     }
 
     const rawText = data.responses[0].textAnnotations[0].description
+    console.log('Vision API: Text extracted, length:', rawText.length)
+    console.log('Vision API: First 200 chars:', rawText.substring(0, 200))
+    
     return parseReceiptText(rawText)
     
-  } catch (error) {
-    console.error('Vision API error:', error)
+  } catch (error: any) {
+    console.error('Vision API: Exception:', error.message)
     throw error
   }
 }

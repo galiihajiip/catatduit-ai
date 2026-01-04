@@ -180,45 +180,43 @@ export async function POST(request: NextRequest) {
         const imageBuffer = await imageResponse.arrayBuffer()
         const base64Image = Buffer.from(imageBuffer).toString('base64')
         
-        // Process with OCR (same as web)
-        const { processReceiptWithVision, processReceiptSimple } = await import('@/lib/ocr')
+        // Process with OCR - MUST USE VISION API
+        const { processReceiptWithVision } = await import('@/lib/ocr')
         
-        let receiptData
         const hasVisionAPI = !!process.env.GOOGLE_CLOUD_VISION_API_KEY
         
         console.log('=== TELEGRAM OCR DEBUG ===')
         console.log('Has Vision API Key:', hasVisionAPI)
         console.log('Image size:', imageBuffer.byteLength, 'bytes')
+        console.log('Base64 length:', base64Image.length)
         
-        if (hasVisionAPI) {
-          try {
-            console.log('Attempting Vision API processing...')
-            receiptData = await processReceiptWithVision(base64Image)
-            console.log('Vision API success! Merchant:', receiptData.merchant, 'Total:', receiptData.total)
-          } catch (visionError) {
-            console.error('Vision API failed:', visionError)
-            console.warn('Falling back to dummy data generator')
-            // Create a mock File object for simple processing
-            const blob = new Blob([Buffer.from(imageBuffer)])
-            const file = new File([blob], 'receipt.jpg', { type: 'image/jpeg' })
-            receiptData = await processReceiptSimple(file)
-          }
-        } else {
-          console.warn('⚠️ GOOGLE_CLOUD_VISION_API_KEY not set - using DUMMY DATA!')
-          console.warn('Set this in Vercel Environment Variables to enable real OCR')
-          const blob = new Blob([Buffer.from(imageBuffer)])
-          const file = new File([blob], 'receipt.jpg', { type: 'image/jpeg' })
-          receiptData = await processReceiptSimple(file)
+        if (!hasVisionAPI) {
+          console.error('❌ GOOGLE_CLOUD_VISION_API_KEY not set!')
+          await sendMessage(chatId, '❌ OCR belum dikonfigurasi. Silakan hubungi admin.')
+          return NextResponse.json({ ok: true })
+        }
+        
+        let receiptData
+        try {
+          console.log('Calling Vision API...')
+          receiptData = await processReceiptWithVision(base64Image)
+          console.log('✅ Vision API success!')
+          console.log('Merchant:', receiptData.merchant)
+          console.log('Total:', receiptData.total)
+          console.log('Items:', receiptData.items.length)
+          console.log('Confidence:', receiptData.confidence)
+        } catch (visionError: any) {
+          console.error('❌ Vision API failed:', visionError)
+          console.error('Error message:', visionError.message)
+          console.error('Error stack:', visionError.stack)
+          
+          await sendMessage(chatId, `❌ Gagal memproses struk.\n\n<b>Error:</b> ${visionError.message}\n\n<i>Silakan coba lagi atau ketik manual.</i>`)
+          return NextResponse.json({ ok: true })
         }
         
         if (receiptData.total === 0) {
           await sendMessage(chatId, '❌ Tidak dapat membaca total dari struk. Silakan foto ulang dengan lebih jelas atau ketik manual.')
           return NextResponse.json({ ok: true })
-        }
-        
-        // Warn user if using dummy data
-        if (!hasVisionAPI) {
-          await sendMessage(chatId, '⚠️ <b>Mode Demo</b>\n\nOCR menggunakan data dummy karena API key belum dikonfigurasi. Hasil mungkin tidak akurat.\n\n<i>Admin: Set GOOGLE_CLOUD_VISION_API_KEY di Vercel</i>')
         }
         
         // Get wallet
