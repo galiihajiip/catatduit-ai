@@ -186,17 +186,26 @@ export async function POST(request: NextRequest) {
         let receiptData
         const hasVisionAPI = !!process.env.GOOGLE_CLOUD_VISION_API_KEY
         
+        console.log('=== TELEGRAM OCR DEBUG ===')
+        console.log('Has Vision API Key:', hasVisionAPI)
+        console.log('Image size:', imageBuffer.byteLength, 'bytes')
+        
         if (hasVisionAPI) {
           try {
+            console.log('Attempting Vision API processing...')
             receiptData = await processReceiptWithVision(base64Image)
+            console.log('Vision API success! Merchant:', receiptData.merchant, 'Total:', receiptData.total)
           } catch (visionError) {
-            console.warn('Vision API failed, using simple processing')
+            console.error('Vision API failed:', visionError)
+            console.warn('Falling back to dummy data generator')
             // Create a mock File object for simple processing
             const blob = new Blob([Buffer.from(imageBuffer)])
             const file = new File([blob], 'receipt.jpg', { type: 'image/jpeg' })
             receiptData = await processReceiptSimple(file)
           }
         } else {
+          console.warn('⚠️ GOOGLE_CLOUD_VISION_API_KEY not set - using DUMMY DATA!')
+          console.warn('Set this in Vercel Environment Variables to enable real OCR')
           const blob = new Blob([Buffer.from(imageBuffer)])
           const file = new File([blob], 'receipt.jpg', { type: 'image/jpeg' })
           receiptData = await processReceiptSimple(file)
@@ -205,6 +214,11 @@ export async function POST(request: NextRequest) {
         if (receiptData.total === 0) {
           await sendMessage(chatId, '❌ Tidak dapat membaca total dari struk. Silakan foto ulang dengan lebih jelas atau ketik manual.')
           return NextResponse.json({ ok: true })
+        }
+        
+        // Warn user if using dummy data
+        if (!hasVisionAPI) {
+          await sendMessage(chatId, '⚠️ <b>Mode Demo</b>\n\nOCR menggunakan data dummy karena API key belum dikonfigurasi. Hasil mungkin tidak akurat.\n\n<i>Admin: Set GOOGLE_CLOUD_VISION_API_KEY di Vercel</i>')
         }
         
         // Get wallet
