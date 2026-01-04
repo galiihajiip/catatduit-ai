@@ -143,6 +143,8 @@ export async function processReceiptSimple(imageFile: File): Promise<ReceiptData
 function parseReceiptText(text: string): ReceiptData {
   const lines = text.toLowerCase().split('\n').filter(l => l.trim())
   
+  console.log('Raw OCR text:', text.substring(0, 200))
+  
   // Extract merchant
   let merchant: string | null = null
   for (const pattern of MERCHANT_PATTERNS) {
@@ -153,56 +155,105 @@ function parseReceiptText(text: string): ReceiptData {
     }
   }
   
-  // Extract total amount
+  // If no merchant found, try first line
+  if (!merchant && lines.length > 0) {
+    const firstLine = lines[0].trim()
+    if (firstLine.length > 3 && firstLine.length < 30) {
+      merchant = firstLine
+    }
+  }
+  
+  // Extract total amount - IMPROVED LOGIC
   let total = 0
   const totalPatterns = [
-    /total\s*:?\s*rp\.?\s*([\d.,]+)/i,
-    /grand total\s*:?\s*rp\.?\s*([\d.,]+)/i,
-    /jumlah\s*:?\s*rp\.?\s*([\d.,]+)/i,
-    /bayar\s*:?\s*rp\.?\s*([\d.,]+)/i,
+    // Indonesian patterns
+    /(?:total|grand\s*total|jumlah|bayar|dibayar)\s*:?\s*rp\.?\s*([\d.,]+)/i,
+    /(?:total|grand\s*total)\s*:?\s*([\d.,]+)/i,
+    // Look for "total" followed by number on same or next line
+    /total[\s\S]{0,20}?([\d.,]{5,})/i,
   ]
   
   for (const pattern of totalPatterns) {
     const match = text.match(pattern)
     if (match) {
-      total = parseAmount(match[1])
-      break
+      const amountStr = match[1]
+      total = parseAmount(amountStr)
+      if (total > 0) {
+        console.log('Found total with pattern:', pattern, '→', total)
+        break
+      }
     }
   }
   
-  // If no total found, find largest number
+  // Fallback: Find largest reasonable number (between 1000 and 10000000)
   if (total === 0) {
-    const numbers = text.match(/\d{4,}/g)
-    if (numbers) {
-      total = Math.max(...numbers.map(n => parseInt(n)))
+    const allNumbers = text.match(/[\d.,]{4,}/g) || []
+    const amounts = allNumbers
+      .map(n => parseAmount(n))
+      .filter(n => n >= 1000 && n <= 10000000) // Reasonable receipt range
+      .sort((a, b) => b - a) // Sort descending
+    
+    if (amounts.length > 0) {
+      total = amounts[0] // Take largest
+      console.log('Using largest number as total:', total)
     }
   }
   
   // Extract items (basic implementation)
   const items: ReceiptItem[] = []
-  const itemPattern = /(.+?)\s+(\d+)\s*x?\s*rp\.?\s*([\d.,]+)/i
+  const itemPatterns = [
+    // Pattern: name qty x price
+    /(.+?)\s+(\d+)\s*x\s*rp?\.?\s*([\d.,]+)/i,
+    // Pattern: name price qty
+    /(.+?)\s+rp?\.?\s*([\d.,]+)\s+(\d+)/i,
+    // Pattern: name price
+    /(.+?)\s+rp?\.?\s*([\d.,]+)/i,
+  ]
   
   for (const line of lines) {
-    const match = line.match(itemPattern)
-    if (match) {
-      const name = match[1].trim()
-      const quantity = parseInt(match[2])
-      const price = parseAmount(match[3])
-      const category = categorizeItem(name)
-      
-      items.push({ name, quantity, price, category })
+    // Skip lines that look like totals or headers
+    if (/total|subtotal|pajak|tax|diskon|discount|kembalian|change/i.test(line)) {
+      continue
+    }
+    
+    for (const pattern of itemPatterns) {
+      const match = line.match(pattern)
+      if (match) {
+        const name = match[1].trim()
+        let quantity = 1
+        let price = 0
+        
+        if (match.length === 4) {
+          // Has quantity
+          quantity = parseInt(match[2]) || 1
+          price = parseAmount(match[3])
+        } else if (match.length === 3) {
+          // No quantity
+          price = parseAmount(match[2])
+        }
+        
+        // Validate item
+        if (name.length > 2 && name.length < 50 && price > 0 && price < 1000000) {
+          const category = categorizeItem(name)
+          items.push({ name, quantity, price, category })
+          break // Found match, move to next line
+        }
+      }
     }
   }
+  
+  console.log('Extracted items:', items.length)
   
   // Extract date
   const dateMatch = text.match(/(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/)
   const date = dateMatch ? dateMatch[1] : null
   
-  // Calculate confidence
+  // Calculate confidence based on what we found
   let confidence = 0
-  if (merchant) confidence += 0.3
-  if (total > 0) confidence += 0.4
-  if (items.length > 0) confidence += 0.3
+  if (merchant) confidence += 0.2
+  if (total > 0) confidence += 0.5
+  if (items.length > 0) confidence += 0.2
+  if (date) confidence += 0.1
   
   return {
     merchant,
@@ -215,11 +266,51 @@ function parseReceiptText(text: string): ReceiptData {
 }
 
 /**
- * Parse amount string to number
+ * Parse amount string to number - IMPROVED
  */
 function parseAmount(amountStr: string): number {
-  const cleaned = amountStr.replace(/[.,]/g, '')
-  return parseInt(cleaned) || 0
+  if (!amountStr) return 0
+  
+  // Remove all non-digit characters except dots and commas
+  let cleaned = amountStr.replace(/[^\d.,]/g, '')
+  
+  // Handle Indonesian number format: 1.234.567,89 or 1,234,567.89
+  // Count dots and commas to determine format
+  const dotCount = (cleaned.match(/\./g) || []).length
+  const commaCount = (cleaned.match(/,/g) || []).length
+  
+  if (dotCount > 1) {
+    // Format: 1.234.567 (dots as thousands separator)
+    cleaned = cleaned.replace(/\./g, '')
+  } else if (commaCount > 1) {
+    // Format: 1,234,567 (commas as thousands separator)
+    cleaned = cleaned.replace(/,/g, '')
+  } else if (dotCount === 1 && commaCount === 1) {
+    // Format: 1.234,56 or 1,234.56
+    const dotPos = cleaned.indexOf('.')
+    const commaPos = cleaned.indexOf(',')
+    if (dotPos < commaPos) {
+      // 1.234,56 → remove dot, replace comma with dot
+      cleaned = cleaned.replace('.', '').replace(',', '.')
+    } else {
+      // 1,234.56 → remove comma
+      cleaned = cleaned.replace(',', '')
+    }
+  } else if (commaCount === 1) {
+    // Could be decimal or thousands
+    const parts = cleaned.split(',')
+    if (parts[1] && parts[1].length <= 2) {
+      // Likely decimal: 12,50
+      cleaned = cleaned.replace(',', '.')
+    } else {
+      // Likely thousands: 1,234
+      cleaned = cleaned.replace(',', '')
+    }
+  }
+  
+  const result = parseFloat(cleaned) || 0
+  console.log('Parse amount:', amountStr, '→', result)
+  return Math.round(result)
 }
 
 /**
