@@ -5,11 +5,14 @@ import { parseTransaction } from '@/lib/nlp'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase credentials')
-}
+// Allow build to succeed without credentials
+const supabase = supabaseUrl && supabaseKey 
+  ? createClient(supabaseUrl, supabaseKey)
+  : null
 
-const supabase = createClient(supabaseUrl || '', supabaseKey || '')
+if (!supabase) {
+  console.warn('Missing Supabase credentials - API will return empty data')
+}
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_TOKEN}`
@@ -111,6 +114,11 @@ function formatCurrency(amount: number): string {
 }
 
 export async function POST(request: NextRequest) {
+  // Return early if no Supabase connection
+  if (!supabase) {
+    return NextResponse.json({ ok: true, message: 'Service unavailable' }, { status: 503 })
+  }
+  
   try {
     const update = await request.json()
     
