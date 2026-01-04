@@ -27,18 +27,43 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   "Belanja": ["baju", "celana", "sepatu", "tas"],
 }
 
-// Merchant patterns
+// Merchant patterns - EXPANDED
 const MERCHANT_PATTERNS = [
-  /alfamart/i,
+  // Minimarket
   /indomaret/i,
+  /alfamart/i,
+  /alfa\s*mart/i,
+  /indo\s*maret/i,
   /hypermart/i,
   /carrefour/i,
   /giant/i,
-  /mcd|mcdonald/i,
+  /lotte\s*mart/i,
+  /superindo/i,
+  /ranch\s*market/i,
+  
+  // Fast Food
+  /mcd|mcdonald|mc\s*donald/i,
   /kfc/i,
-  /burger king/i,
+  /burger\s*king/i,
+  /pizza\s*hut/i,
+  /domino/i,
+  /wendy/i,
+  /a&w/i,
+  
+  // Coffee & Cafe
   /starbucks/i,
-  /kopi kenangan/i,
+  /kopi\s*kenangan/i,
+  /janji\s*jiwa/i,
+  /fore\s*coffee/i,
+  /kopi\s*tuku/i,
+  /excelso/i,
+  
+  // Restaurant
+  /solaria/i,
+  /hoka\s*hoka\s*bento/i,
+  /yoshinoya/i,
+  /pepper\s*lunch/i,
+  /bakmi\s*gm/i,
 ]
 
 /**
@@ -141,36 +166,56 @@ export async function processReceiptSimple(imageFile: File): Promise<ReceiptData
  * Parse extracted text to structured receipt data
  */
 function parseReceiptText(text: string): ReceiptData {
-  const lines = text.toLowerCase().split('\n').filter(l => l.trim())
+  const lines = text.split('\n').filter(l => l.trim())
+  const textLower = text.toLowerCase()
   
-  console.log('Raw OCR text:', text.substring(0, 200))
+  console.log('=== OCR PARSING START ===')
+  console.log('Total lines:', lines.length)
+  console.log('First 300 chars:', text.substring(0, 300))
   
-  // Extract merchant
+  // Extract merchant - IMPROVED
   let merchant: string | null = null
+  
+  // Try exact patterns first
   for (const pattern of MERCHANT_PATTERNS) {
     const match = text.match(pattern)
     if (match) {
-      merchant = match[0]
+      merchant = match[0].trim()
+      // Capitalize properly
+      merchant = merchant.split(' ').map(w => 
+        w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+      ).join(' ')
+      console.log('Merchant found (pattern):', merchant)
       break
     }
   }
   
-  // If no merchant found, try first line
-  if (!merchant && lines.length > 0) {
-    const firstLine = lines[0].trim()
-    if (firstLine.length > 3 && firstLine.length < 30) {
-      merchant = firstLine
+  // If no merchant found, check first 3 lines for store name
+  if (!merchant) {
+    for (let i = 0; i < Math.min(3, lines.length); i++) {
+      const line = lines[i].trim()
+      // Store name usually: 3-30 chars, mostly letters, at top
+      if (line.length >= 3 && line.length <= 30 && /[a-z]/i.test(line)) {
+        // Skip if it's a number or address
+        if (!/^\d+$/.test(line) && !/jl\.|jalan|street|no\./i.test(line)) {
+          merchant = line
+          console.log('Merchant found (first lines):', merchant)
+          break
+        }
+      }
     }
   }
   
   // Extract total amount - IMPROVED LOGIC
   let total = 0
   const totalPatterns = [
-    // Indonesian patterns
+    // Most common patterns
     /(?:total|grand\s*total|jumlah|bayar|dibayar)\s*:?\s*rp\.?\s*([\d.,]+)/i,
     /(?:total|grand\s*total)\s*:?\s*([\d.,]+)/i,
-    // Look for "total" followed by number on same or next line
+    // Look for "total" followed by number within 20 chars
     /total[\s\S]{0,20}?([\d.,]{5,})/i,
+    // Just "Rp" followed by large number at end of line
+    /rp\.?\s*([\d.,]{5,})\s*$/im,
   ]
   
   for (const pattern of totalPatterns) {
@@ -179,13 +224,13 @@ function parseReceiptText(text: string): ReceiptData {
       const amountStr = match[1]
       total = parseAmount(amountStr)
       if (total > 0) {
-        console.log('Found total with pattern:', pattern, '→', total)
+        console.log('Total found with pattern:', pattern.source.substring(0, 50), '→', total)
         break
       }
     }
   }
   
-  // Fallback: Find largest reasonable number (between 1000 and 10000000)
+  // Fallback: Find largest reasonable number
   if (total === 0) {
     const allNumbers = text.match(/[\d.,]{4,}/g) || []
     const amounts = allNumbers
@@ -195,58 +240,87 @@ function parseReceiptText(text: string): ReceiptData {
     
     if (amounts.length > 0) {
       total = amounts[0] // Take largest
-      console.log('Using largest number as total:', total)
+      console.log('Using largest number as total:', total, 'from', amounts.length, 'candidates')
     }
   }
   
-  // Extract items (basic implementation)
+  // Extract items - IMPROVED
   const items: ReceiptItem[] = []
   const itemPatterns = [
-    // Pattern: name qty x price
-    /(.+?)\s+(\d+)\s*x\s*rp?\.?\s*([\d.,]+)/i,
-    // Pattern: name price qty
-    /(.+?)\s+rp?\.?\s*([\d.,]+)\s+(\d+)/i,
-    // Pattern: name price
-    /(.+?)\s+rp?\.?\s*([\d.,]+)/i,
+    // Pattern: name qty x price (e.g., "Indomie 2 x 3000")
+    /^(.+?)\s+(\d+)\s*x\s*rp?\.?\s*([\d.,]+)/i,
+    // Pattern: name price qty (e.g., "Indomie 3000 2")
+    /^(.+?)\s+rp?\.?\s*([\d.,]+)\s+(\d+)\s*$/i,
+    // Pattern: name price (e.g., "Indomie 3000")
+    /^(.+?)\s+rp?\.?\s*([\d.,]+)\s*$/i,
+    // Pattern: name @ price (e.g., "Indomie @ 3000")
+    /^(.+?)\s*@\s*rp?\.?\s*([\d.,]+)/i,
   ]
   
   for (const line of lines) {
-    // Skip lines that look like totals or headers
-    if (/total|subtotal|pajak|tax|diskon|discount|kembalian|change/i.test(line)) {
-      continue
-    }
+    const trimmed = line.trim()
+    
+    // Skip lines that are clearly not items
+    if (trimmed.length < 3) continue
+    if (/^(total|subtotal|pajak|tax|ppn|diskon|discount|kembalian|change|tunai|cash|kartu|card)/i.test(trimmed)) continue
+    if (/^[\d\s\-:\/]+$/.test(trimmed)) continue // Skip date/time lines
+    if (/^(terima kasih|thank you|selamat|welcome)/i.test(trimmed)) continue
     
     for (const pattern of itemPatterns) {
-      const match = line.match(pattern)
+      const match = trimmed.match(pattern)
       if (match) {
-        const name = match[1].trim()
+        let name = match[1].trim()
         let quantity = 1
         let price = 0
         
-        if (match.length === 4) {
-          // Has quantity
+        // Parse based on pattern
+        if (pattern.source.includes('x')) {
+          // Pattern with 'x': name qty x price
           quantity = parseInt(match[2]) || 1
           price = parseAmount(match[3])
-        } else if (match.length === 3) {
-          // No quantity
+        } else if (match.length === 4) {
+          // Pattern: name price qty
+          price = parseAmount(match[2])
+          quantity = parseInt(match[3]) || 1
+        } else {
+          // Pattern: name price
           price = parseAmount(match[2])
         }
         
+        // Clean up name
+        name = name.replace(/^[\d\s\-*]+/, '').trim() // Remove leading numbers/symbols
+        
         // Validate item
-        if (name.length > 2 && name.length < 50 && price > 0 && price < 1000000) {
+        const isValidName = name.length >= 3 && name.length <= 50
+        const isValidPrice = price >= 100 && price <= 1000000
+        const isValidQty = quantity >= 1 && quantity <= 100
+        
+        if (isValidName && isValidPrice && isValidQty) {
           const category = categorizeItem(name)
           items.push({ name, quantity, price, category })
+          console.log('Item found:', { name, quantity, price, category })
           break // Found match, move to next line
         }
       }
     }
   }
   
-  console.log('Extracted items:', items.length)
+  console.log('Total items extracted:', items.length)
   
   // Extract date
-  const dateMatch = text.match(/(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/)
-  const date = dateMatch ? dateMatch[1] : null
+  const datePatterns = [
+    /(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/,
+    /(\d{4}[/-]\d{1,2}[/-]\d{1,2})/,
+  ]
+  
+  let date: string | null = null
+  for (const pattern of datePatterns) {
+    const match = text.match(pattern)
+    if (match) {
+      date = match[1]
+      break
+    }
+  }
   
   // Calculate confidence based on what we found
   let confidence = 0
@@ -254,6 +328,9 @@ function parseReceiptText(text: string): ReceiptData {
   if (total > 0) confidence += 0.5
   if (items.length > 0) confidence += 0.2
   if (date) confidence += 0.1
+  
+  console.log('=== OCR PARSING END ===')
+  console.log('Result:', { merchant, total, itemCount: items.length, confidence })
   
   return {
     merchant,
