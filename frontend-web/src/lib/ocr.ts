@@ -260,11 +260,51 @@ function parseReceiptText(text: string): ReceiptData {
   for (const line of lines) {
     const trimmed = line.trim()
     
-    // Skip lines that are clearly not items
+    // Skip empty or very short lines
     if (trimmed.length < 3) continue
-    if (/^(total|subtotal|pajak|tax|ppn|diskon|discount|kembalian|change|tunai|cash|kartu|card)/i.test(trimmed)) continue
-    if (/^[\d\s\-:\/]+$/.test(trimmed)) continue // Skip date/time lines
-    if (/^(terima kasih|thank you|selamat|welcome)/i.test(trimmed)) continue
+    
+    // EXPANDED: Skip lines that are clearly not items
+    const skipPatterns = [
+      // Totals & calculations
+      /^(total|subtotal|grand total|pajak|tax|ppn|diskon|discount|potongan|kembalian|change|tunai|cash|kartu|card|debit|credit)/i,
+      
+      // Store info
+      /^(jl\.|jalan|street|no\.|alamat|address|telp|phone|fax|email|website|www)/i,
+      
+      // Promo & marketing
+      /^(promo|diskon|hemat|cashback|poin|point|member|dapatkan|terima|selamat|welcome|thank|thanks|terima kasih)/i,
+      
+      // Receipt metadata
+      /^(kasir|cashier|operator|struk|receipt|nota|invoice|no\s*trans|transaksi|transaction)/i,
+      
+      // Date & time (standalone)
+      /^[\d\s\-:\/]+$/,
+      
+      // Barcode & codes
+      /^[\d\*\#\-]{10,}$/,
+      
+      // Social media & website
+      /^(ig|instagram|fb|facebook|twitter|tiktok|@|follow|like)/i,
+      
+      // Common footer text
+      /^(barang|yang|sudah|dibeli|tidak|dapat|ditukar|kembali|goods|sold|cannot|be|returned)/i,
+      
+      // Very long lines (likely address or promo text)
+      /^.{60,}$/,
+      
+      // Lines with mostly symbols
+      /^[\*\-=_\s]{3,}$/,
+    ]
+    
+    let shouldSkip = false
+    for (const pattern of skipPatterns) {
+      if (pattern.test(trimmed)) {
+        shouldSkip = true
+        break
+      }
+    }
+    
+    if (shouldSkip) continue
     
     for (const pattern of itemPatterns) {
       const match = trimmed.match(pattern)
@@ -289,13 +329,30 @@ function parseReceiptText(text: string): ReceiptData {
         
         // Clean up name
         name = name.replace(/^[\d\s\-*]+/, '').trim() // Remove leading numbers/symbols
+        name = name.replace(/\s+/g, ' ') // Normalize spaces
+        
+        // Additional name validation - skip if contains noise keywords
+        const noiseKeywords = [
+          'promo', 'diskon', 'hemat', 'gratis', 'free', 'bonus',
+          'member', 'poin', 'point', 'cashback',
+          'jalan', 'alamat', 'telp', 'phone',
+          'kasir', 'operator', 'struk', 'nota',
+          'terima kasih', 'thank', 'selamat', 'welcome'
+        ]
+        
+        const hasNoise = noiseKeywords.some(keyword => 
+          name.toLowerCase().includes(keyword)
+        )
+        
+        if (hasNoise) continue
         
         // Validate item
         const isValidName = name.length >= 3 && name.length <= 50
         const isValidPrice = price >= 100 && price <= 1000000
         const isValidQty = quantity >= 1 && quantity <= 100
+        const hasLetters = /[a-z]/i.test(name) // Must contain letters
         
-        if (isValidName && isValidPrice && isValidQty) {
+        if (isValidName && isValidPrice && isValidQty && hasLetters) {
           const category = categorizeItem(name)
           items.push({ name, quantity, price, category })
           console.log('Item found:', { name, quantity, price, category })
