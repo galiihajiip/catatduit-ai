@@ -5,6 +5,7 @@ import Sidebar, { HamburgerButton } from '@/components/Sidebar'
 import Dashboard from '@/components/Dashboard'
 import LoginPage from '@/components/LoginPage'
 import ReceiptScanner from '@/components/ReceiptScanner'
+import AddWalletModal from '@/components/AddWalletModal'
 import { UpgradeModal } from '@/components/ProBadge'
 import { Icons } from '@/components/Icons'
 import { formatCurrency } from '@/lib/utils'
@@ -210,11 +211,17 @@ export default function Home() {
               selectedYear={selectedYear}
               onMonthChange={setSelectedMonth}
               onYearChange={setSelectedYear}
+              onRefresh={() => telegramId && fetchData(telegramId)}
+              userId={telegramId || undefined}
             />
           )}
           
           {activeTab === 'wallets' && (
-            <WalletsPage wallets={analytics.wallets} />
+            <WalletsPage 
+              wallets={analytics.wallets} 
+              telegramId={telegramId || undefined}
+              onRefresh={() => telegramId && fetchData(telegramId)}
+            />
           )}
           
           {activeTab === 'analytics' && (
@@ -248,7 +255,8 @@ export default function Home() {
 }
 
 // Wallets Page Component
-function WalletsPage({ wallets }: { wallets: any[] }) {
+function WalletsPage({ wallets, telegramId, onRefresh }: { wallets: any[], telegramId?: string, onRefresh?: () => void }) {
+  const [showAddWalletModal, setShowAddWalletModal] = useState(false)
   const totalBalance = wallets.reduce((sum, w) => sum + w.balance, 0)
   const sortedWallets = [...wallets].sort((a, b) => b.balance - a.balance)
   
@@ -262,14 +270,23 @@ function WalletsPage({ wallets }: { wallets: any[] }) {
           </div>
           <p className="text-text-secondary">Kelola semua dompet Anda</p>
         </div>
-        <a
-          href="https://t.me/caborin_bot"
-          target="_blank"
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors w-fit"
-        >
-          <Icons.plus className="w-4 h-4" />
-          Tambah via Telegram
-        </a>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowAddWalletModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors"
+          >
+            <Icons.plus className="w-4 h-4" />
+            Tambah Wallet
+          </button>
+          <a
+            href="https://t.me/caborin_bot"
+            target="_blank"
+            className="flex items-center gap-2 px-4 py-2 bg-accent-blue/10 text-accent-blue rounded-xl hover:bg-accent-blue/20 transition-colors"
+          >
+            <Icons.telegram className="w-4 h-4" />
+            via Telegram
+          </a>
+        </div>
       </div>
       
       <div className="bg-gradient-to-br from-primary to-primary-light rounded-2xl p-6 text-white shadow-xl shadow-primary/30">
@@ -320,6 +337,18 @@ function WalletsPage({ wallets }: { wallets: any[] }) {
           Gunakan perintah <code className="bg-white px-2 py-1 rounded">/addwallet [nama]</code> di Telegram untuk menambah dompet baru
         </p>
       </div>
+      
+      {/* Add Wallet Modal */}
+      {showAddWalletModal && telegramId && (
+        <AddWalletModal
+          userId={telegramId}
+          onClose={() => setShowAddWalletModal(false)}
+          onSuccess={() => {
+            setShowAddWalletModal(false)
+            onRefresh?.()
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { formatCurrency, getCategoryIcon } from '@/lib/utils'
 import { Icons } from './Icons'
+import AddWalletModal from './AddWalletModal'
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   AreaChart, Area, XAxis, YAxis, CartesianGrid
@@ -15,6 +16,8 @@ interface DashboardProps {
   selectedYear: number
   onMonthChange: (month: number) => void
   onYearChange: (year: number) => void
+  onRefresh?: () => void
+  userId?: string
 }
 
 const months = [
@@ -29,10 +32,13 @@ export default function Dashboard({
   selectedMonth,
   selectedYear,
   onMonthChange,
-  onYearChange
+  onYearChange,
+  onRefresh,
+  userId
 }: DashboardProps) {
   const [showAllWallets, setShowAllWallets] = useState(false)
   const [trendPeriod, setTrendPeriod] = useState<'3' | '6' | '12'>('6')
+  const [showAddWalletModal, setShowAddWalletModal] = useState(false)
 
   const totalBalance = analytics.wallets?.reduce((sum: number, w: any) => sum + w.balance, 0) || 0
   const sortedWallets = [...(analytics.wallets || [])].sort((a, b) => b.balance - a.balance)
@@ -128,15 +134,24 @@ export default function Dashboard({
                   <Icons.creditCard className="w-4 h-4 text-white/80" />
                   <p className="text-white/80 text-sm font-medium">Rincian Saldo</p>
                 </div>
-                {sortedWallets.length > 3 && (
+                <div className="flex items-center gap-2">
                   <button 
-                    onClick={() => setShowAllWallets(!showAllWallets)}
-                    className="text-white/80 text-xs hover:text-white flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full"
+                    onClick={() => setShowAddWalletModal(true)}
+                    className="text-white/80 text-xs hover:text-white flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full hover:bg-white/20 transition-colors"
                   >
-                    {showAllWallets ? 'Sembunyikan' : 'Lihat Semua'}
-                    <Icons.chevronRight className={`w-3 h-3 transition-transform ${showAllWallets ? 'rotate-90' : ''}`} />
+                    <Icons.plus className="w-3 h-3" />
+                    Tambah
                   </button>
-                )}
+                  {sortedWallets.length > 3 && (
+                    <button 
+                      onClick={() => setShowAllWallets(!showAllWallets)}
+                      className="text-white/80 text-xs hover:text-white flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full"
+                    >
+                      {showAllWallets ? 'Sembunyikan' : 'Lihat Semua'}
+                      <Icons.chevronRight className={`w-3 h-3 transition-transform ${showAllWallets ? 'rotate-90' : ''}`} />
+                    </button>
+                  )}
+                </div>
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -513,6 +528,22 @@ function AnalysisCard({ title, value, description, icon, color, progress }: {
           style={{ width: `${Math.min(progress, 100)}%` }}
         />
       </div>
+    </div>
+  )
+}
+
+
+      {/* Add Wallet Modal */}
+      {showAddWalletModal && userId && (
+        <AddWalletModal
+          userId={userId}
+          onClose={() => setShowAddWalletModal(false)}
+          onSuccess={() => {
+            setShowAddWalletModal(false)
+            onRefresh?.()
+          }}
+        />
+      )}
     </div>
   )
 }
