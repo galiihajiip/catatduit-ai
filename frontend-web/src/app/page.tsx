@@ -185,7 +185,7 @@ export default function Home() {
               </button>
               
               <a
-                href="https://t.me/caborin_bot"
+                href="https://t.me/catatduitgalih_bot"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 px-3 py-2 text-sm bg-accent-blue/10 text-accent-blue rounded-xl hover:bg-accent-blue/20 transition-colors"
@@ -279,7 +279,7 @@ function WalletsPage({ wallets, telegramId, onRefresh }: { wallets: any[], teleg
             Tambah Wallet
           </button>
           <a
-            href="https://t.me/caborin_bot"
+            href="https://t.me/catatduitgalih_bot"
             target="_blank"
             className="flex items-center gap-2 px-4 py-2 bg-accent-blue/10 text-accent-blue rounded-xl hover:bg-accent-blue/20 transition-colors"
           >
@@ -527,14 +527,14 @@ function SettingsPage({ telegramId, onLogout }: { telegramId: string | null; onL
           <h3 className="font-semibold text-text-primary">Integrasi</h3>
         </div>
         <a
-          href="https://t.me/caborin_bot"
+          href="https://t.me/catatduitgalih_bot"
           target="_blank"
           className="flex items-center gap-3 p-4 bg-accent-blue/10 rounded-xl hover:bg-accent-blue/20 transition-colors"
         >
           <Icons.telegram className="w-8 h-8 text-accent-blue" />
           <div>
             <p className="font-medium text-text-primary">Telegram Bot</p>
-            <p className="text-sm text-text-secondary">@caborin_bot</p>
+            <p className="text-sm text-text-secondary">@catatduitgalih_bot</p>
           </div>
           <Icons.chevronRight className="w-5 h-5 ml-auto text-accent-blue" />
         </a>

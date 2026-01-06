@@ -362,7 +362,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 </p>
 
 <p align="center">
-  <a href="https://t.me/caborin_bot">
+  <a href="https://t.me/catatduitgalih_bot">
     <img src="https://img.shields.io/badge/Try%20Bot-Telegram-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Try on Telegram"/>
   </a>
 </p>

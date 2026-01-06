@@ -102,7 +102,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               Belum punya akun?
             </p>
             <a
-              href="https://t.me/caborin_bot"
+              href="https://t.me/catatduitgalih_bot"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-3 w-full py-3 bg-accent-blue/10 text-accent-blue font-medium rounded-xl hover:bg-accent-blue/20 transition-colors"
@@ -120,7 +120,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             <h3 className="font-medium text-text-primary">Cara mendapatkan Telegram ID:</h3>
           </div>
           <ol className="text-sm text-text-secondary space-y-1 ml-6">
-            <li>1. Buka <a href="https://t.me/caborin_bot" target="_blank" className="text-primary hover:underline">@caborin_bot</a></li>
+            <li>1. Buka <a href="https://t.me/catatduitgalih_bot" target="_blank" className="text-primary hover:underline">@catatduitgalih_bot</a></li>
             <li>2. Kirim perintah <code className="bg-gray-100 px-2 py-0.5 rounded">/start</code></li>
             <li>3. Bot akan mengirimkan Telegram ID Anda</li>
           </ol>
@@ -129,7 +129,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         {/* Footer with Social Links */}
         <div className="mt-6 flex items-center justify-center gap-4">
           <a
-            href="https://t.me/caborin_bot"
+            href="https://t.me/catatduitgalih_bot"
             target="_blank"
             rel="noopener noreferrer"
             className="p-2 bg-accent-blue/10 text-accent-blue rounded-lg hover:bg-accent-blue/20 transition-colors"

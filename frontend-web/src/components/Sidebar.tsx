@@ -140,7 +140,7 @@ export default function Sidebar({
         {/* Social Links */}
         <div className="px-4 pb-2 space-y-2">
           <a
-            href="https://t.me/caborin_bot"
+            href="https://t.me/catatduitgalih_bot"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-accent-blue/10 to-blue-500/10 text-accent-blue rounded-xl hover:from-accent-blue/20 hover:to-blue-500/20 transition-all"
