@@ -458,6 +458,18 @@ export default function Dashboard({
           </div>
         </div>
       </div>
+      
+      {/* Add Wallet Modal */}
+      {showAddWalletModal && userId && (
+        <AddWalletModal
+          userId={userId}
+          onClose={() => setShowAddWalletModal(false)}
+          onSuccess={() => {
+            setShowAddWalletModal(false)
+            onRefresh?.()
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -528,22 +540,6 @@ function AnalysisCard({ title, value, description, icon, color, progress }: {
           style={{ width: `${Math.min(progress, 100)}%` }}
         />
       </div>
-    </div>
-  )
-}
-
-
-      {/* Add Wallet Modal */}
-      {showAddWalletModal && userId && (
-        <AddWalletModal
-          userId={userId}
-          onClose={() => setShowAddWalletModal(false)}
-          onSuccess={() => {
-            setShowAddWalletModal(false)
-            onRefresh?.()
-          }}
-        />
-      )}
     </div>
   )
 }
