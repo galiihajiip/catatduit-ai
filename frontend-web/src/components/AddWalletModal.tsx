@@ -32,6 +32,17 @@ export default function AddWalletModal({ userId, onClose, onSuccess }: AddWallet
     setLoading(true)
 
     try {
+      // Get user UUID from telegram_id
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('telegram_id', userId)
+        .single()
+
+      if (userError || !user) {
+        throw new Error('User not found')
+      }
+
       const walletName = selectedTemplate ? selectedTemplate.name : customName
       const icon = selectedTemplate ? selectedTemplate.icon : '💰'
       const color = selectedTemplate ? selectedTemplate.color : '#7F8C8D'
@@ -40,7 +51,7 @@ export default function AddWalletModal({ userId, onClose, onSuccess }: AddWallet
       const { error } = await supabase
         .from('wallets')
         .insert({
-          user_id: userId,
+          user_id: user.id, // Use UUID, not telegram_id
           name: walletName,
           balance: initialBalance,
           color_hex: color,
