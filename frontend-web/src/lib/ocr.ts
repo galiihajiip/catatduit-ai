@@ -292,7 +292,8 @@ export function parseReceiptText(text: string): ReceiptData {
   const totalPatterns = [
     // Most reliable: explicit "total" keyword
     { pattern: /(?:total|grand\s*total)\s*:?\s*rp\.?\s*([\d.,]+)/i, score: 100 },
-    { pattern: /(?:jumlah|bayar|dibayar)\s*:?\s*rp\.?\s*([\d.,]+)/i, score: 90 },
+    { pattern: /(?:jumlah|bayar|dibayar|total\s*bayar)\s*:?\s*rp\.?\s*([\d.,]+)/i, score: 95 },
+    { pattern: /(?:harga\s*jual|total\s*harga)\s*:?\s*rp\.?\s*([\d.,]+)/i, score: 90 },
     
     // Medium reliability: "total" near number
     { pattern: /total[\s\S]{0,15}?([\d.,]{5,})/i, score: 70 },
@@ -318,6 +319,10 @@ export function parseReceiptText(text: string): ReceiptData {
           contextScore += 20
         }
         
+        // Boost score if amount is larger (total usually largest number)
+        if (amount > 50000) contextScore += 10
+        if (amount > 100000) contextScore += 10
+        
         if (contextScore > bestTotalScore) {
           bestTotalScore = contextScore
           total = amount
@@ -327,35 +332,21 @@ export function parseReceiptText(text: string): ReceiptData {
     }
   }
   
-  // Fallback: Find largest reasonable number (only if no total found)
+  // Fallback: Find largest reasonable number in bottom half
   if (total === 0) {
-    const allNumbers = text.match(/[\d.,]{4,}/g) || []
+    const textLines = text.split('\n')
+    const bottomHalfStart = Math.floor(textLines.length / 2)
+    const bottomHalf = textLines.slice(bottomHalfStart).join('\n')
+    
+    const allNumbers = bottomHalf.match(/[\d.,]{4,}/g) || []
     const amounts = allNumbers
       .map(n => parseAmount(n))
       .filter(n => n >= 1000 && n <= 10000000) // Reasonable receipt range
       .sort((a, b) => b - a) // Sort descending
     
     if (amounts.length > 0) {
-      // Take largest, but prefer numbers in bottom half of text
-      const textLines = text.split('\n')
-      const bottomHalfStart = Math.floor(textLines.length / 2)
-      
-      for (const amount of amounts) {
-        const amountStr = amount.toString()
-        const lineIndex = textLines.findIndex(line => line.includes(amountStr))
-        
-        if (lineIndex >= bottomHalfStart) {
-          total = amount
-          console.log('Using largest number from bottom half:', total)
-          break
-        }
-      }
-      
-      // If still no total, just use largest
-      if (total === 0) {
-        total = amounts[0]
-        console.log('Using largest number as fallback:', total)
-      }
+      total = amounts[0] // Take largest from bottom half
+      console.log('Using largest number from bottom half:', total)
     }
   }
   
@@ -386,6 +377,9 @@ export function parseReceiptText(text: string): ReceiptData {
     const skipPatterns = [
       // Totals & calculations
       /^(total|subtotal|grand total|pajak|tax|ppn|diskon|discount|potongan|kembalian|change|tunai|cash|kartu|card|debit|credit)/i,
+      
+      // Cancelled/void items
+      /cancel|batal|void|dibatalkan|cancelled/i,
       
       // Store info
       /^(jl\.|jalan|street|no\.|alamat|address|telp|phone|fax|email|website|www)/i,
