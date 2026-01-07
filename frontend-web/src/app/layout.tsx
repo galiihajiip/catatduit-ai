@@ -1,9 +1,12 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { ThemeProvider } from '@/contexts/ThemeContext'
+import { LanguageProvider } from '@/contexts/LanguageContext'
+import { translations } from '@/translations'
 
 export const metadata: Metadata = {
-  title: 'Catat.in Duit - AI Finance Manager',
-  description: 'AI-powered personal finance management. Cukup chat, keuangan langsung tercatat & dianalisis.',
+  title: 'CatatDuit AI - AI Finance Manager',
+  description: 'AI-powered personal finance management. Track your finances with ease.',
 }
 
 export default function RootLayout({
@@ -12,9 +15,16 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="id">
-      <body className="bg-background min-h-screen">
-        {children}
+    <html lang="id" suppressHydrationWarning>
+      <head>
+        <meta name="theme-color" content="#F8FAFC" />
+      </head>
+      <body className="bg-background-primary min-h-screen">
+        <ThemeProvider>
+          <LanguageProvider translations={translations}>
+            {children}
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
