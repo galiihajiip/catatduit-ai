@@ -112,106 +112,52 @@ export async function processReceiptWithVision(imageBase64: string): Promise<Rec
   }
 
   console.log('Vision API: Starting request...')
-  console.log('Vision API: Image size:', imageBase64.length, 'chars')
+
+  const ts = Date.now()
+  const tmp = tmpdir()
+  const reqFile = join(tmp, `vision_req_${ts}.json`)
+  const resFile = join(tmp, `vision_res_${ts}.json`)
+  const ps1File = join(tmp, `vision_${ts}.ps1`)
 
   try {
-    // Write request body to temp file (avoid PowerShell string length limits)
-    const tmpInput = join(tmpdir(), `vision_req_${Date.now()}.json`).replace(/\\/g, '/')
-    const tmpOutput = join(tmpdir(), `vision_res_${Date.now()}.json`).replace(/\\/g, '/')
-    
-    writeFileSync(tmpInput.replace(/\//g, '\\'), JSON.stringify({
+    // Write request body
+    writeFileSync(reqFile, JSON.stringify({
       requests: [{
         image: { content: imageBase64 },
         features: [{ type: 'TEXT_DETECTION' }]
       }]
     }))
 
-    execSync(
-      `powershell -Command "$b=[System.IO.File]::ReadAllText('${tmpInput}');$r=(Invoke-WebRequest -Uri 'https://vision.googleapis.com/v1/images:annotate?key=${apiKey}' -Method Post -ContentType 'application/json' -Body $b -UseBasicParsing).Content;[System.IO.File]::WriteAllText('${tmpOutput}',$r)"`,
-      { timeout: 30000 }
-    )
+    // Write PS1 script (no escaping issues)
+    const ps1 = `$b = [System.IO.File]::ReadAllText("${reqFile.replace(/\\/g, '\\\\')}")
+$r = (Invoke-WebRequest -Uri "https://vision.googleapis.com/v1/images:annotate?key=${apiKey}" -Method Post -ContentType "application/json" -Body $b -UseBasicParsing).Content
+[System.IO.File]::WriteAllText("${resFile.replace(/\\/g, '\\\\')}", $r)`
 
-    const rawOutput = readFileSync(tmpOutput.replace(/\//g, '\\'), 'utf8')
-    try { unlinkSync(tmpInput.replace(/\//g, '\\')) } catch {}
-    try { unlinkSync(tmpOutput.replace(/\//g, '\\')) } catch {}
+    writeFileSync(ps1File, ps1)
 
+    execSync(`powershell -ExecutionPolicy Bypass -File "${ps1File}"`, { timeout: 30000 })
+
+    const rawOutput = readFileSync(resFile, 'utf8')
     const data = JSON.parse(rawOutput)
 
     console.log('Vision API: Response received')
 
-    if (!data.responses || !data.responses[0]) {
-      throw new Error('No response from Vision API')
-    }
-    
-    if (!data.responses[0].textAnnotations || data.responses[0].textAnnotations.length === 0) {
+    if (!data.responses?.[0]?.textAnnotations?.length) {
       throw new Error('No text detected in image')
     }
 
     const rawText = data.responses[0].textAnnotations[0].description
     console.log('Vision API: Text extracted, length:', rawText.length)
-    console.log('Vision API: First 200 chars:', rawText.substring(0, 200))
-    
+
     return parseReceiptText(rawText)
-    
+
   } catch (error: any) {
     console.error('Vision API: Exception:', error.message)
     throw error
-  }
-}
-
-/**
- * Fallback: Simple OCR using pattern matching
- * Works without any API key - good for demo/basic usage
- */
-export async function processReceiptSimple(imageFile: File): Promise<ReceiptData> {
-  // Generate realistic demo data based on common receipt patterns
-  const merchants = ["Alfamart", "Indomaret", "Starbucks", "KFC", "Warung Makan"]
-  const merchant = merchants[Math.floor(Math.random() * merchants.length)]
-  
-  // Generate random but realistic total (10k - 200k)
-  const total = Math.floor(Math.random() * 190000) + 10000
-  
-  // Generate 2-5 items
-  const itemCount = Math.floor(Math.random() * 4) + 2
-  const items: ReceiptItem[] = []
-  
-  const sampleItems = [
-    { name: "Nasi Goreng", category: "Makanan", priceRange: [15000, 35000] },
-    { name: "Ayam Goreng", category: "Makanan", priceRange: [20000, 40000] },
-    { name: "Es Teh", category: "Minuman", priceRange: [5000, 15000] },
-    { name: "Kopi", category: "Minuman", priceRange: [10000, 30000] },
-    { name: "Mie Goreng", category: "Makanan", priceRange: [12000, 25000] },
-    { name: "Snack", category: "Makanan", priceRange: [5000, 20000] },
-  ]
-  
-  let itemTotal = 0
-  for (let i = 0; i < itemCount; i++) {
-    const item = sampleItems[Math.floor(Math.random() * sampleItems.length)]
-    const price = Math.floor(
-      Math.random() * (item.priceRange[1] - item.priceRange[0]) + item.priceRange[0]
-    )
-    const quantity = Math.random() > 0.7 ? 2 : 1
-    
-    items.push({
-      name: item.name,
-      quantity,
-      price: price * quantity,
-      category: item.category
-    })
-    
-    itemTotal += price * quantity
-  }
-  
-  // Adjust total to match items (roughly)
-  const finalTotal = itemTotal + Math.floor(Math.random() * 5000)
-  
-  return {
-    merchant,
-    total: finalTotal,
-    items,
-    date: new Date().toISOString().split('T')[0],
-    confidence: 0.75, // Lower confidence for simple processing
-    rawText: `Simple OCR processing - ${merchant} - ${items.length} items`
+  } finally {
+    try { unlinkSync(reqFile) } catch {}
+    try { unlinkSync(resFile) } catch {}
+    try { unlinkSync(ps1File) } catch {}
   }
 }
 

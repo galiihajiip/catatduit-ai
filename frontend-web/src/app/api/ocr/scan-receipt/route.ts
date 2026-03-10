@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { processReceiptWithVision, processReceiptSimple, fileToBase64 } from '@/lib/ocr'
+import { processReceiptWithVision, fileToBase64 } from '@/lib/ocr'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY
@@ -40,25 +40,28 @@ export async function POST(request: NextRequest) {
     // Convert file to base64
     const base64 = await fileToBase64(file)
 
-    // Try Google Vision API if configured, otherwise use simple processing
+    // Try Google Vision API
     let receiptData
     const hasVisionAPI = !!process.env.GOOGLE_CLOUD_VISION_API_KEY
     
-    console.log('Processing mode:', hasVisionAPI ? 'Vision API' : 'Simple')
+    console.log('Processing mode:', hasVisionAPI ? 'Vision API' : 'No API key')
     
-    if (hasVisionAPI) {
-      try {
-        receiptData = await processReceiptWithVision(base64)
-        console.log('Vision API success:', { total: receiptData.total, confidence: receiptData.confidence })
-      } catch (visionError: any) {
-        console.warn('Vision API failed:', visionError.message)
-        receiptData = await processReceiptSimple(file)
-        console.log('Fallback to simple processing:', { total: receiptData.total })
-      }
-    } else {
-      // Use simple processing (no API key needed)
-      receiptData = await processReceiptSimple(file)
-      console.log('Simple processing:', { total: receiptData.total })
+    if (!hasVisionAPI) {
+      return NextResponse.json(
+        { error: 'Google Vision API key not configured', detail: 'Set GOOGLE_CLOUD_VISION_API_KEY in environment' },
+        { status: 503 }
+      )
+    }
+
+    try {
+      receiptData = await processReceiptWithVision(base64)
+      console.log('Vision API success:', { total: receiptData.total, confidence: receiptData.confidence })
+    } catch (visionError: any) {
+      console.error('Vision API failed:', visionError.message)
+      return NextResponse.json(
+        { error: 'Gagal membaca struk', detail: visionError.message },
+        { status: 500 }
+      )
     }
 
     // Get user
