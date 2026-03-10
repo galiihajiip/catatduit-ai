@@ -128,14 +128,17 @@ export async function processReceiptWithVision(imageBase64: string): Promise<Rec
       }]
     }))
 
-    // Write PS1 script (no escaping issues)
-    const ps1 = `$b = [System.IO.File]::ReadAllText("${reqFile.replace(/\\/g, '\\\\')}")
+    // Write PS1 script - use forward slashes (PowerShell supports them, avoids escaping issues)
+    const reqFilePs = reqFile.replace(/\\/g, '/')
+    const resFilePs = resFile.replace(/\\/g, '/')
+    const ps1 = `$b = [System.IO.File]::ReadAllText("${reqFilePs}")
 $r = (Invoke-WebRequest -Uri "https://vision.googleapis.com/v1/images:annotate?key=${apiKey}" -Method Post -ContentType "application/json" -Body $b -UseBasicParsing).Content
-[System.IO.File]::WriteAllText("${resFile.replace(/\\/g, '\\\\')}", $r)`
+[System.IO.File]::WriteAllText("${resFilePs}", $r)`
 
     writeFileSync(ps1File, ps1)
 
-    execSync(`powershell -ExecutionPolicy Bypass -File "${ps1File}"`, { timeout: 30000 })
+    const ps1FilePs = ps1File.replace(/\\/g, '/')
+    execSync(`powershell -ExecutionPolicy Bypass -File "${ps1FilePs}"`, { timeout: 30000 })
 
     const rawOutput = readFileSync(resFile, 'utf8')
     const data = JSON.parse(rawOutput)
