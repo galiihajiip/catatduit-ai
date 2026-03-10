@@ -2,6 +2,10 @@
  * OCR Processing using Google Cloud Vision API
  * This runs serverless on Vercel without needing Python backend
  */
+import { execSync } from 'child_process'
+import { writeFileSync, readFileSync, unlinkSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 
 interface ReceiptItem {
   name: string
@@ -111,36 +115,35 @@ export async function processReceiptWithVision(imageBase64: string): Promise<Rec
   console.log('Vision API: Image size:', imageBase64.length, 'chars')
 
   try {
-    const response = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requests: [{
-            image: { content: imageBase64 },
-            features: [{ type: 'TEXT_DETECTION' }]
-          }]
-        })
-      }
+    // Write request body to temp file (avoid PowerShell string length limits)
+    const tmpInput = join(tmpdir(), `vision_req_${Date.now()}.json`).replace(/\\/g, '/')
+    const tmpOutput = join(tmpdir(), `vision_res_${Date.now()}.json`).replace(/\\/g, '/')
+    
+    writeFileSync(tmpInput.replace(/\//g, '\\'), JSON.stringify({
+      requests: [{
+        image: { content: imageBase64 },
+        features: [{ type: 'TEXT_DETECTION' }]
+      }]
+    }))
+
+    execSync(
+      `powershell -Command "$b=[System.IO.File]::ReadAllText('${tmpInput}');$r=(Invoke-WebRequest -Uri 'https://vision.googleapis.com/v1/images:annotate?key=${apiKey}' -Method Post -ContentType 'application/json' -Body $b -UseBasicParsing).Content;[System.IO.File]::WriteAllText('${tmpOutput}',$r)"`,
+      { timeout: 30000 }
     )
 
-    console.log('Vision API: Response status:', response.status)
+    const rawOutput = readFileSync(tmpOutput.replace(/\//g, '\\'), 'utf8')
+    try { unlinkSync(tmpInput.replace(/\//g, '\\')) } catch {}
+    try { unlinkSync(tmpOutput.replace(/\//g, '\\')) } catch {}
 
-    const data = await response.json()
-    
-    if (!response.ok) {
-      console.error('Vision API: Error response:', data)
-      throw new Error(`Vision API error: ${data.error?.message || 'Unknown error'}`)
-    }
-    
+    const data = JSON.parse(rawOutput)
+
+    console.log('Vision API: Response received')
+
     if (!data.responses || !data.responses[0]) {
-      console.error('Vision API: No responses in data')
       throw new Error('No response from Vision API')
     }
     
     if (!data.responses[0].textAnnotations || data.responses[0].textAnnotations.length === 0) {
-      console.warn('Vision API: No text detected in image')
       throw new Error('No text detected in image')
     }
 
