@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { parseTransaction } from '@/lib/nlp'
+import https from 'https'
+import { execSync } from 'child_process'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY
@@ -20,17 +22,41 @@ if (!isConfigured) {
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_TOKEN}`
 
+async function httpsGet(url: string): Promise<{ json(): Promise<any>; arrayBuffer(): Promise<ArrayBuffer> }> {
+  return new Promise((resolve, reject) => {
+    const tmpOut = `${process.env.TEMP || 'C:\\Windows\\Temp'}\\tg_dl_${Date.now()}.bin`
+    try {
+      execSync(`powershell -Command "Invoke-WebRequest -Uri '${url}' -OutFile '${tmpOut}' -UseBasicParsing"`, { timeout: 15000 })
+      const buf = require('fs').readFileSync(tmpOut)
+      try { require('fs').unlinkSync(tmpOut) } catch {}
+      resolve({
+        json: async () => JSON.parse(buf.toString()),
+        arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
+      })
+    } catch (e) {
+      reject(e)
+    }
+  })
+}
+
 async function sendMessage(chatId: number, text: string, replyMarkup?: object) {
-  await fetch(`${TELEGRAM_API}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  try {
+    const payload = JSON.stringify({
       chat_id: chatId,
       text,
       parse_mode: 'HTML',
-      reply_markup: replyMarkup
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {})
     })
-  })
+    const tmpFile = `${process.env.TEMP || 'C:\\Windows\\Temp'}\\tg_msg_${Date.now()}.json`
+    require('fs').writeFileSync(tmpFile, payload)
+    execSync(
+      `powershell -Command "Invoke-RestMethod -Uri 'https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage' -Method Post -ContentType 'application/json' -InFile '${tmpFile}'"`,
+      { timeout: 10000 }
+    )
+    try { require('fs').unlinkSync(tmpFile) } catch {}
+  } catch (err: any) {
+    console.error('sendMessage error:', err.message?.substring(0, 200))
+  }
 }
 
 async function getOrCreateUser(telegramId: string, name: string) {
@@ -162,7 +188,7 @@ export async function POST(request: NextRequest) {
         )
         
         // Download photo from Telegram
-        const fileResponse = await fetch(
+        const fileResponse = await httpsGet(
           `https://api.telegram.org/bot${TELEGRAM_TOKEN}/getFile?file_id=${largestPhoto.file_id}`
         )
         const fileData = await fileResponse.json()
@@ -176,7 +202,7 @@ export async function POST(request: NextRequest) {
         const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${filePath}`
         
         // Download image
-        const imageResponse = await fetch(fileUrl)
+        const imageResponse = await httpsGet(fileUrl)
         const imageBuffer = await imageResponse.arrayBuffer()
         const base64Image = Buffer.from(imageBuffer).toString('base64')
         
@@ -631,9 +657,9 @@ Ketik /today untuk lihat ringkasan.
     
     return NextResponse.json({ ok: true })
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Webhook error:', error)
-    return NextResponse.json({ ok: false, error: 'Internal error' }, { status: 500 })
+    return NextResponse.json({ ok: false, error: error?.message || String(error), stack: error?.stack }, { status: 500 })
   }
 }
 
