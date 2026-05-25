@@ -47,6 +47,8 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
   const [scanResult, setScanResult] = useState<ScanResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [demoWarning, setDemoWarning] = useState<string | null>(null)
+  const [capturedPhoto, setCapturedPhoto] = useState<Blob | null>(null)
+  const [capturedPreviewUrl, setCapturedPreviewUrl] = useState<string | null>(null)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -54,10 +56,19 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [cameraReady, setCameraReady] = useState(false)
 
+  const clearCapturedPhoto = () => {
+    if (capturedPreviewUrl) {
+      URL.revokeObjectURL(capturedPreviewUrl)
+    }
+    setCapturedPhoto(null)
+    setCapturedPreviewUrl(null)
+  }
+
   const startCamera = async () => {
     try {
       setError(null)
       setCameraReady(false)
+      clearCapturedPhoto()
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: 'environment' },
@@ -114,7 +125,6 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
       return
     }
 
-    setProcessingMessage('Mengambil dan mengompres foto struk...')
     const scale = Math.min(1, MAX_CAMERA_IMAGE_WIDTH / video.videoWidth)
     canvas.width = Math.round(video.videoWidth * scale)
     canvas.height = Math.round(video.videoHeight * scale)
@@ -123,7 +133,16 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
 
     try {
       const blob = await canvasToBlob(canvas)
-      await processImage(blob)
+      if (blob.size > MAX_CLIENT_IMAGE_SIZE) {
+        setError('Foto terlalu besar. Coba ambil foto lebih dekat atau gunakan upload gambar yang lebih kecil.')
+        return
+      }
+
+      const previewUrl = URL.createObjectURL(blob)
+      clearCapturedPhoto()
+      setCapturedPhoto(blob)
+      setCapturedPreviewUrl(previewUrl)
+      stopCamera()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal mengambil foto dari kamera')
       setIsProcessing(false)
@@ -214,6 +233,7 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
     setScanResult(null)
     setError(null)
     setDemoWarning(null)
+    clearCapturedPhoto()
   }
 
   const handleClose = () => {
@@ -222,6 +242,7 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
     setScanResult(null)
     setError(null)
     setDemoWarning(null)
+    clearCapturedPhoto()
   }
 
   const switchToCamera = () => {
@@ -232,6 +253,7 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
   const switchToUpload = () => {
     setMode('upload')
     stopCamera()
+    clearCapturedPhoto()
   }
 
   if (!isOpen) {
@@ -323,23 +345,65 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
           {/* Camera Mode */}
           {mode === 'camera' && !scanResult && (
             <div className="space-y-4">
-              <div className="relative bg-black rounded-xl overflow-hidden">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-auto"
-                />
-                <canvas ref={canvasRef} className="hidden" />
-              </div>
-              <button
-                onClick={capturePhoto}
-                disabled={isProcessing || !stream || !cameraReady}
-                className="w-full py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary-light transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                <Icons.camera className="w-5 h-5" />
-                {isProcessing ? 'Memproses...' : cameraReady ? 'Ambil Foto' : 'Menyiapkan Kamera...'}
-              </button>
+              {capturedPreviewUrl ? (
+                <>
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <p className="mb-3 text-center text-sm font-bold text-emerald-800">
+                      Foto berhasil diambil. Cek dulu, lalu proses OCR.
+                    </p>
+                    <img
+                      src={capturedPreviewUrl}
+                      alt="Preview foto struk"
+                      className="max-h-[45vh] w-full rounded-lg object-contain"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <button
+                      onClick={async () => {
+                        clearCapturedPhoto()
+                        await startCamera()
+                      }}
+                      disabled={isProcessing}
+                      className="w-full rounded-xl border border-gray-300 bg-white py-3 font-medium text-gray-800 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Foto Ulang
+                    </button>
+                    <button
+                      onClick={() => capturedPhoto && processImage(capturedPhoto)}
+                      disabled={isProcessing || !capturedPhoto}
+                      className="w-full rounded-xl bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-light disabled:opacity-50"
+                    >
+                      {isProcessing ? 'Memproses...' : 'Pakai Foto Ini'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="relative overflow-hidden rounded-xl bg-black">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="h-auto w-full"
+                    />
+                    {!cameraReady && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm font-semibold text-white">
+                        Menyiapkan kamera...
+                      </div>
+                    )}
+                    <canvas ref={canvasRef} className="hidden" />
+                  </div>
+                  <button
+                    onClick={capturePhoto}
+                    disabled={isProcessing || !stream || !cameraReady}
+                    className="w-full py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary-light transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    <Icons.camera className="w-5 h-5" />
+                    {isProcessing ? 'Memproses...' : cameraReady ? 'Ambil Foto' : 'Menyiapkan Kamera...'}
+                  </button>
+                </>
+              )}
               <p className="text-center text-xs font-medium text-gray-600">
                 Pastikan struk terang, tidak miring, dan memenuhi sebagian besar layar.
               </p>
