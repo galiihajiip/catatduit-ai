@@ -39,10 +39,10 @@ export const en: TranslationKeys = {
   auth: {
     login: 'Login',
     logout: 'Logout',
-    loginWithTelegram: 'Login with Telegram',
-    loginDescription: 'Use Telegram to login to your account',
-    loginButton: 'Open Telegram Bot',
-    loginInstructions: 'Click the button below to open the Telegram bot and start tracking your finances',
+    loginWithTelegram: 'Login with Demo Account',
+    loginDescription: 'Use the demo account to open the dashboard',
+    loginButton: 'Login Demo',
+    loginInstructions: 'Use the demo ID and password shown on the login page',
   },
 
   dashboard: {

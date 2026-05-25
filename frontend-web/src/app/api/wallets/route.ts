@@ -23,16 +23,16 @@ export async function GET(request: NextRequest) {
   }
   
   const { searchParams } = new URL(request.url)
-  const telegramId = searchParams.get('telegram_id')
+  const userId = searchParams.get('user_id') || searchParams.get('telegram_id')
   
-  if (!telegramId) {
-    return NextResponse.json({ error: 'telegram_id required' }, { status: 400 })
+  if (!userId) {
+    return NextResponse.json({ error: 'user_id required' }, { status: 400 })
   }
   
   const { data: user } = await supabase
     .from('users')
     .select('id')
-    .eq('telegram_id', telegramId)
+    .eq('telegram_id', userId)
     .single()
   
   if (!user) {
@@ -56,16 +56,17 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json()
-    const { telegram_id, name, balance = 0, color_hex = '#16A085', icon = 'wallet' } = body
+    const { user_id, telegram_id, name, balance = 0, color_hex = '#16A085', icon = 'wallet' } = body
+    const userKey = user_id || telegram_id
     
-    if (!telegram_id || !name) {
-      return NextResponse.json({ error: 'telegram_id and name required' }, { status: 400 })
+    if (!userKey || !name) {
+      return NextResponse.json({ error: 'user_id and name required' }, { status: 400 })
     }
     
     const { data: user } = await supabase
       .from('users')
       .select('id')
-      .eq('telegram_id', telegram_id)
+      .eq('telegram_id', userKey)
       .single()
     
     if (!user) {
@@ -114,16 +115,17 @@ export async function PUT(request: NextRequest) {
   
   try {
     const body = await request.json()
-    const { telegram_id, wallet_id, name, balance, color_hex, icon } = body
+    const { user_id, telegram_id, wallet_id, name, balance, color_hex, icon } = body
+    const userKey = user_id || telegram_id
     
-    if (!telegram_id || !wallet_id) {
-      return NextResponse.json({ error: 'telegram_id and wallet_id required' }, { status: 400 })
+    if (!userKey || !wallet_id) {
+      return NextResponse.json({ error: 'user_id and wallet_id required' }, { status: 400 })
     }
     
     const { data: user } = await supabase
       .from('users')
       .select('id')
-      .eq('telegram_id', telegram_id)
+      .eq('telegram_id', userKey)
       .single()
     
     if (!user) {
@@ -173,17 +175,17 @@ export async function DELETE(request: NextRequest) {
   }
   
   const { searchParams } = new URL(request.url)
-  const telegramId = searchParams.get('telegram_id')
+  const userId = searchParams.get('user_id') || searchParams.get('telegram_id')
   const walletId = searchParams.get('wallet_id')
   
-  if (!telegramId || !walletId) {
-    return NextResponse.json({ error: 'telegram_id and wallet_id required' }, { status: 400 })
+  if (!userId || !walletId) {
+    return NextResponse.json({ error: 'user_id and wallet_id required' }, { status: 400 })
   }
   
   const { data: user } = await supabase
     .from('users')
     .select('id')
-    .eq('telegram_id', telegramId)
+    .eq('telegram_id', userId)
     .single()
   
   if (!user) {

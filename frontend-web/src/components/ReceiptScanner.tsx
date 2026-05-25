@@ -5,7 +5,7 @@ import { Icons } from './Icons'
 import { formatCurrency } from '@/lib/utils'
 
 interface ReceiptScannerProps {
-  telegramId: string
+  userId: string
   onSuccess?: () => void
 }
 
@@ -22,12 +22,13 @@ interface ScanResult {
   confidence: number
 }
 
-export default function ReceiptScanner({ telegramId, onSuccess }: ReceiptScannerProps) {
+export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [mode, setMode] = useState<'upload' | 'camera'>('upload')
   const [isProcessing, setIsProcessing] = useState(false)
   const [scanResult, setScanResult] = useState<ScanResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [demoWarning, setDemoWarning] = useState<string | null>(null)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -95,29 +96,45 @@ export default function ReceiptScanner({ telegramId, onSuccess }: ReceiptScanner
   const processImage = async (imageFile: Blob) => {
     setIsProcessing(true)
     setError(null)
+    setDemoWarning(null)
     setScanResult(null)
 
     try {
       const formData = new FormData()
       formData.append('file', imageFile)
-      formData.append('telegram_id', telegramId)
+      formData.append('user_id', userId)
 
       const response = await fetch('/api/ocr/scan-receipt', {
         method: 'POST',
         body: formData
       })
 
-      const data = await response.json()
+      const text = await response.text()
+      let data: {
+        success?: boolean
+        demo_mode?: boolean
+        message?: string
+        receipt_data?: ScanResult
+        error?: string
+        detail?: string
+      }
+      try {
+        data = text ? JSON.parse(text) : {}
+      } catch {
+        setError('Server mengembalikan respons tidak valid. Coba lagi atau restart npm run dev.')
+        return
+      }
 
-      if (response.ok && data.success) {
+      if (response.ok && data.success && data.receipt_data) {
         setScanResult(data.receipt_data)
+        setDemoWarning(data.demo_mode ? (data.message ?? null) : null)
         stopCamera()
-        if (onSuccess) onSuccess()
+        if (onSuccess && !data.demo_mode) onSuccess()
       } else {
-        setError(data.detail || 'Gagal memproses struk')
+        setError(data.detail || data.error || 'Gagal memproses struk')
       }
     } catch (err) {
-      setError('Terjadi kesalahan saat memproses gambar')
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat memproses gambar')
       console.error('Process error:', err)
     } finally {
       setIsProcessing(false)
@@ -128,6 +145,7 @@ export default function ReceiptScanner({ telegramId, onSuccess }: ReceiptScanner
     setIsOpen(true)
     setScanResult(null)
     setError(null)
+    setDemoWarning(null)
   }
 
   const handleClose = () => {
@@ -135,6 +153,7 @@ export default function ReceiptScanner({ telegramId, onSuccess }: ReceiptScanner
     stopCamera()
     setScanResult(null)
     setError(null)
+    setDemoWarning(null)
   }
 
   const switchToCamera = () => {
@@ -160,7 +179,7 @@ export default function ReceiptScanner({ telegramId, onSuccess }: ReceiptScanner
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white text-black rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -276,40 +295,52 @@ export default function ReceiptScanner({ telegramId, onSuccess }: ReceiptScanner
             </div>
           )}
 
+          {demoWarning && (
+            <div className="bg-accent-orange/10 border border-accent-orange/20 rounded-xl p-4 flex items-start gap-3">
+              <Icons.alertCircle className="w-5 h-5 text-accent-orange flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-accent-orange font-medium">Mode demo</p>
+                <p className="text-sm text-accent-orange/80 mt-1">{demoWarning}</p>
+              </div>
+            </div>
+          )}
+
           {/* Success Result */}
           {scanResult && (
             <div className="space-y-4">
-              <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 flex items-start gap-3">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3 text-black">
                 <Icons.check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-primary font-medium">Struk berhasil diproses!</p>
-                  <p className="text-sm text-primary/80 mt-1">
-                    Transaksi telah dicatat dan saldo dompet diperbarui
+                  <p className="text-black font-bold">Struk berhasil dibaca!</p>
+                  <p className="text-sm text-black font-medium mt-1">
+                    {demoWarning
+                      ? 'Data struk tampil di bawah. Simpan ke database butuh konfigurasi Supabase.'
+                      : 'Transaksi telah dicatat dan saldo dompet diperbarui'}
                   </p>
                 </div>
               </div>
 
               {/* Receipt Details */}
-              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3 text-gray-950">
                 {scanResult.merchant && (
                   <div className="flex items-center justify-between">
-                    <span className="text-text-secondary">Merchant</span>
-                    <span className="font-medium text-text-primary">{scanResult.merchant}</span>
+                    <span className="font-medium text-gray-700">Merchant</span>
+                    <span className="font-semibold text-gray-950">{scanResult.merchant}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className="text-text-secondary">Total Belanja</span>
+                  <span className="font-medium text-gray-700">Total Belanja</span>
                   <span className="font-bold text-xl text-accent-red">
                     {formatCurrency(scanResult.total)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-text-secondary">Jumlah Item</span>
-                  <span className="font-medium text-text-primary">{scanResult.items_count}</span>
+                  <span className="font-medium text-gray-700">Jumlah Item</span>
+                  <span className="font-semibold text-gray-950">{scanResult.items_count}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-text-secondary">Confidence</span>
-                  <span className={`font-medium ${
+                  <span className="font-medium text-gray-700">Confidence</span>
+                  <span className={`font-bold ${
                     scanResult.confidence >= 0.8 ? 'text-primary' : 'text-accent-orange'
                   }`}>
                     {(scanResult.confidence * 100).toFixed(0)}%
@@ -320,20 +351,25 @@ export default function ReceiptScanner({ telegramId, onSuccess }: ReceiptScanner
               {/* Items List */}
               {scanResult.items && scanResult.items.length > 0 && (
                 <div>
-                  <h3 className="font-semibold text-text-primary mb-2">Detail Item</h3>
-                  <div className="space-y-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-bold text-gray-950">Detail Item</h3>
+                    <span className="text-sm font-medium text-gray-700">
+                      {scanResult.items.length} item terbaca
+                    </span>
+                  </div>
+                  <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
                     {scanResult.items.map((item, index) => (
                       <div
-                        key={index}
-                        className="bg-white border border-gray-100 rounded-lg p-3 flex items-center justify-between"
+                        key={`${item.name}-${item.price}-${index}`}
+                        className="bg-white border border-gray-200 rounded-lg p-3 flex items-start justify-between gap-3 shadow-sm"
                       >
-                        <div className="flex-1">
-                          <p className="font-medium text-text-primary">{item.name}</p>
-                          <p className="text-sm text-text-secondary">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-gray-950 break-words">{item.name}</p>
+                          <p className="text-sm font-medium text-gray-700">
                             {item.quantity}x • {item.category}
                           </p>
                         </div>
-                        <span className="font-medium text-text-primary">
+                        <span className="font-bold text-gray-950 whitespace-nowrap">
                           {formatCurrency(item.price)}
                         </span>
                       </div>

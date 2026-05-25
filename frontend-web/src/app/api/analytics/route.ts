@@ -34,17 +34,17 @@ export async function GET(request: NextRequest) {
   }
   
   const { searchParams } = new URL(request.url)
-  const telegramId = searchParams.get('telegram_id')
+  const userId = searchParams.get('user_id') || searchParams.get('telegram_id')
   
-  if (!telegramId) {
-    return NextResponse.json({ error: 'telegram_id required' }, { status: 400 })
+  if (!userId) {
+    return NextResponse.json({ error: 'user_id required' }, { status: 400 })
   }
   
   // Get user
   const { data: user } = await supabase
     .from('users')
     .select('id')
-    .eq('telegram_id', telegramId)
+    .eq('telegram_id', userId)
     .single()
   
   if (!user) {

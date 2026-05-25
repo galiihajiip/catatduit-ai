@@ -1,62 +1,78 @@
-# 🚀 Run Local dengan Ngrok
+# Run Local
 
-## Step 1: Edit Environment Variables
-Buka file `frontend-web/.env.local` dan isi dengan credentials lo:
+Panduan menjalankan CatatDuit AI versi demo login + OCR lokal.
+
+## 1. Setup Environment
+
+Buat `frontend-web/.env.local` dari template:
+
+```bash
+cd frontend-web
+cp .env.example .env.local
 ```
+
+Isi credential Supabase:
+
+```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_KEY=your-service-key
-TELEGRAM_BOT_TOKEN=your-bot-token
-GOOGLE_CLOUD_VISION_API_KEY=your-new-api-key
+SUPABASE_SERVICE_KEY=your-service-role-key
 ```
 
-## Step 2: Install Dependencies (kalau belum)
+Tidak perlu Google Vision API key, Google application credentials, Telegram bot token, atau ngrok.
+
+## 2. Setup Database
+
+Jalankan file berikut di Supabase SQL Editor:
+
+```text
+supabase/schema.sql
+```
+
+## 3. Install Dependencies
+
 ```bash
 cd frontend-web
 npm install
 ```
 
-## Step 3: Run Development Server
+## 4. Run Development Server
+
 ```bash
 npm run dev
 ```
 
-Server jalan di http://localhost:3000
+Server berjalan di:
 
-## Step 4: Install Ngrok (kalau belum punya)
-Download dari: https://ngrok.com/download
-Atau pake chocolatey (Windows):
-```bash
-choco install ngrok
+```text
+http://localhost:3000
 ```
 
-## Step 5: Expose ke Internet dengan Ngrok
-Buka terminal baru, jalankan:
-```bash
-ngrok http 3000
+## 5. Login Demo
+
+Gunakan akun demo:
+
+```text
+ID       : demo
+Password : demo123
 ```
 
-Lo bakal dapet URL kayak: `https://abc123.ngrok.io`
+Saat login pertama, API akan membuat user demo dan wallet `Cash` di Supabase jika belum ada.
 
-## Step 6: Update Telegram Webhook
-Ganti `YOUR_BOT_TOKEN` dan `YOUR_NGROK_URL`:
-```bash
-curl -X POST "https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook?url=https://YOUR_NGROK_URL/api/telegram/webhook"
-```
+## 6. Test OCR
 
-Contoh:
-```bash
-curl -X POST "https://api.telegram.org/bot123456:ABC-DEF/setWebhook?url=https://abc123.ngrok.io/api/telegram/webhook"
-```
-
-## Step 7: Test!
-Upload struk ke bot Telegram lo. Sekarang harusnya work!
+1. Login ke dashboard.
+2. Klik tombol scan struk.
+3. Upload foto struk.
+4. Hasil OCR akan dicatat sebagai transaksi dan saldo wallet diperbarui.
 
 ## Troubleshooting
-- Kalau ngrok error: pastikan port 3000 gak dipake app lain
-- Kalau webhook gagal: cek TELEGRAM_BOT_TOKEN udah bener
-- Kalau OCR error: cek GOOGLE_CLOUD_VISION_API_KEY udah bener
+
+- Jika login gagal, cek `SUPABASE_SERVICE_KEY`.
+- Jika dashboard kosong, pastikan `supabase/schema.sql` sudah dijalankan.
+- Jika OCR lambat saat pertama kali dipakai, Tesseract.js sedang memuat data bahasa.
+- Jika muncul file `*.traineddata`, file tersebut adalah cache OCR dan sudah di-ignore.
 
 ## Stop Server
-- Ctrl+C di terminal Next.js
-- Ctrl+C di terminal Ngrok
+
+Tekan `Ctrl+C` di terminal yang menjalankan `npm run dev`.

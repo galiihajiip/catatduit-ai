@@ -1,20 +1,13 @@
-/**
- * OCR Processing using Google Cloud Vision API
- * This runs serverless on Vercel without needing Python backend
- */
-import { execSync } from 'child_process'
-import { writeFileSync, readFileSync, unlinkSync } from 'fs'
-import { tmpdir } from 'os'
-import { join } from 'path'
+import { categorizeTransactionText } from './nlp'
 
-interface ReceiptItem {
+export interface ReceiptItem {
   name: string
   quantity: number
   price: number
   category: string
 }
 
-interface ReceiptData {
+export interface ReceiptData {
   merchant: string | null
   total: number
   items: ReceiptItem[]
@@ -23,517 +16,360 @@ interface ReceiptData {
   rawText: string
 }
 
-// Category keywords for auto-categorization
-const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  "Makanan": ["nasi", "mie", "roti", "kue", "snack", "ayam", "sate", "bakso", "gorengan"],
-  "Minuman": ["kopi", "teh", "jus", "air", "susu", "minuman", "es"],
-  "Keperluan Rumah Tangga": ["sabun", "detergen", "shampo", "tissue", "pasta gigi"],
-  "Belanja": ["baju", "celana", "sepatu", "tas"],
+export interface ProcessedReceipt extends ReceiptData {
+  ocrEngine: 'tesseract'
 }
 
-// Merchant patterns - COMPREHENSIVE
 const MERCHANT_PATTERNS = [
-  // Minimarket & Supermarket
   /indomaret/i,
   /alfamart/i,
   /alfa\s*mart/i,
   /indo\s*maret/i,
   /hypermart/i,
   /carrefour/i,
-  /giant/i,
-  /lotte\s*mart/i,
   /superindo/i,
-  /ranch\s*market/i,
   /transmart/i,
   /yogya/i,
-  
-  // Fast Food
-  /mcd|mcdonald|mc\s*donald/i,
-  /kfc/i,
-  /burger\s*king/i,
-  /pizza\s*hut/i,
-  /domino/i,
-  /wendy/i,
-  /a&w/i,
-  /texas\s*chicken/i,
-  /richeese/i,
-  /hoka\s*hoka\s*bento/i,
-  /yoshinoya/i,
-  /pepper\s*lunch/i,
-  
-  // Bakery & Pastry
-  /breadtalk/i,
-  /bread\s*talk/i,
-  /bread\s*life/i,
-  /breadlife/i,
+  /bread\s*talk|breadtalk/i,
   /holland\s*bakery/i,
-  /bake\s*culture/i,
-  /tous\s*les\s*jours/i,
-  /paris\s*baguette/i,
-  
-  // Coffee & Cafe
   /starbucks/i,
   /kopi\s*kenangan/i,
   /janji\s*jiwa/i,
   /fore\s*coffee/i,
-  /kopi\s*tuku/i,
-  /excelso/i,
-  /coffee\s*bean/i,
-  /dunkin/i,
-  /j\.?co/i,
-  
-  // Restaurant
+  /mcd|mcdonald|mc\s*donald/i,
+  /kfc/i,
+  /burger\s*king/i,
+  /pizza\s*hut/i,
   /solaria/i,
-  /bakmi\s*gm/i,
-  /warunk\s*upnormal/i,
-  /sushi\s*tei/i,
-  /genki\s*sushi/i,
-  /ichiban\s*sushi/i,
-  /hokben/i,
-  /sabana/i,
-  /es\s*teler\s*77/i,
-  
-  // Pharmacy & Health
+  /hokben|hoka\s*hoka\s*bento/i,
   /guardian/i,
   /watsons/i,
-  /century/i,
   /kimia\s*farma/i,
   /apotek/i,
 ]
 
-/**
- * Process receipt image using Google Cloud Vision API
- */
-export async function processReceiptWithVision(imageBase64: string): Promise<ReceiptData> {
-  const apiKey = process.env.GOOGLE_CLOUD_VISION_API_KEY
-  
-  if (!apiKey) {
-    throw new Error('Google Cloud Vision API key not configured')
-  }
+const TOTAL_PATTERNS: Array<{ pattern: RegExp; score: number }> = [
+  { pattern: /(?:grand\s*total|total\s*akhir|total)\s*:?\s*(?:rp\.?\s*)?([\d.,]+)/i, score: 100 },
+  { pattern: /(?:jumlah|bayar|dibayar|total\s*bayar)\s*:?\s*(?:rp\.?\s*)?([\d.,]+)/i, score: 90 },
+  { pattern: /(?:subtotal|sub\s*total)\s*:?\s*(?:rp\.?\s*)?([\d.,]+)/i, score: 60 },
+]
 
-  console.log('Vision API: Starting request...')
+const SKIP_ITEM_LINE_PATTERNS = [
+  /^(total|sub\s*total|subtotal|grand total|pajak|tax|ppn|diskon|discount|potongan|kembalian|change|tunai|cash|kartu|debit|credit)/i,
+  /^(bayar|dibayar|payment|paid|saldo|metode|uang|kembali|kembalian)(\s|\(|:|$)/i,
+  /^(token|no\.?\s*meter|idpel|id\s*pel|pln|stroom|jml\s*kwh|kwh)(\s|:|$)/i,
+  /\b(jml\s*kwh|kwh|no\.?\s*meter|idpel|id\s*pel)\b/i,
+  /^(jl\.|jalan|street|alamat|address|telp|phone|fax|email|website|www)/i,
+  /^(kasir|cashier|operator|struk|receipt|nota|invoice|no\s*trans|transaksi|transaction|check no)/i,
+  /^(promo|hemat|cashback|member|poin|point|terima kasih|thank|thanks|welcome)/i,
+  /^[\d\s\-:\/.]+$/,
+  /^[\d*#-]{8,}$/,
+  /^[*\-=_\s]{3,}$/,
+]
 
-  const ts = Date.now()
-  const tmp = tmpdir()
-  const reqFile = join(tmp, `vision_req_${ts}.json`)
-  const resFile = join(tmp, `vision_res_${ts}.json`)
-  const ps1File = join(tmp, `vision_${ts}.ps1`)
-
-  try {
-    // Write request body
-    writeFileSync(reqFile, JSON.stringify({
-      requests: [{
-        image: { content: imageBase64 },
-        features: [{ type: 'TEXT_DETECTION' }]
-      }]
-    }))
-
-    // Write PS1 script - use forward slashes (PowerShell supports them, avoids escaping issues)
-    const reqFilePs = reqFile.replace(/\\/g, '/')
-    const resFilePs = resFile.replace(/\\/g, '/')
-    const ps1 = `$b = [System.IO.File]::ReadAllText("${reqFilePs}")
-$r = (Invoke-WebRequest -Uri "https://vision.googleapis.com/v1/images:annotate?key=${apiKey}" -Method Post -ContentType "application/json" -Body $b -UseBasicParsing).Content
-[System.IO.File]::WriteAllText("${resFilePs}", $r)`
-
-    writeFileSync(ps1File, ps1)
-
-    const ps1FilePs = ps1File.replace(/\\/g, '/')
-    execSync(`powershell -ExecutionPolicy Bypass -File "${ps1FilePs}"`, { timeout: 30000 })
-
-    const rawOutput = readFileSync(resFile, 'utf8')
-    const data = JSON.parse(rawOutput)
-
-    console.log('Vision API: Response received')
-
-    if (!data.responses?.[0]?.textAnnotations?.length) {
-      throw new Error('No text detected in image')
-    }
-
-    const rawText = data.responses[0].textAnnotations[0].description
-    console.log('Vision API: Text extracted, length:', rawText.length)
-
-    return parseReceiptText(rawText)
-
-  } catch (error: any) {
-    console.error('Vision API: Exception:', error.message)
-    throw error
-  } finally {
-    try { unlinkSync(reqFile) } catch {}
-    try { unlinkSync(resFile) } catch {}
-    try { unlinkSync(ps1File) } catch {}
-  }
+function normalizeLines(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
 }
 
-/**
- * Parse extracted text to structured receipt data
- * EXPORTED for use in Telegram webhook
- */
-export function parseReceiptText(text: string): ReceiptData {
-  const lines = text.split('\n').filter(l => l.trim())
-  const textLower = text.toLowerCase()
-  
-  console.log('=== OCR PARSING START ===')
-  console.log('Total lines:', lines.length)
-  console.log('First 300 chars:', text.substring(0, 300))
-  
-  // Extract merchant - IMPROVED WITH SCORING
+function toTitleCase(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+export function parseAmount(value: string): number {
+  const raw = value.replace(/[^\d.,]/g, '')
+  if (!raw) return 0
+
+  let normalized = raw
+  const dotCount = (raw.match(/\./g) ?? []).length
+  const commaCount = (raw.match(/,/g) ?? []).length
+
+  if (dotCount > 1 && commaCount === 0) {
+    normalized = raw.replace(/\./g, '')
+  } else if (commaCount > 1 && dotCount === 0) {
+    normalized = raw.replace(/,/g, '')
+  } else if (dotCount > 0 && commaCount > 0) {
+    const lastDot = raw.lastIndexOf('.')
+    const lastComma = raw.lastIndexOf(',')
+    normalized =
+      lastComma > lastDot
+        ? raw.replace(/\./g, '').replace(',', '.')
+        : raw.replace(/,/g, '')
+  } else if (commaCount === 1) {
+    const [, decimalPart] = raw.split(',')
+    normalized = decimalPart.length <= 2 ? raw.replace(',', '.') : raw.replace(',', '')
+  } else if (dotCount === 1) {
+    const [, decimalPart] = raw.split('.')
+    normalized = decimalPart.length === 3 ? raw.replace('.', '') : raw
+  }
+
+  return Math.round(Number.parseFloat(normalized) || 0)
+}
+
+function extractMerchant(text: string, lines: string[]): string | null {
   let merchant: string | null = null
   let bestScore = 0
-  
-  // Try exact patterns first with scoring
+
   for (const pattern of MERCHANT_PATTERNS) {
     const match = text.match(pattern)
-    if (match) {
-      const matchedText = match[0].trim()
-      const matchIndex = text.indexOf(matchedText)
-      
-      // Score based on position (earlier = better) and length
-      let score = 100
-      if (matchIndex < 100) score += 50 // Very early in text
-      else if (matchIndex < 300) score += 30 // Early in text
-      score += matchedText.length * 2 // Longer match = more specific
-      
-      if (score > bestScore) {
-        bestScore = score
-        merchant = matchedText
-        // Capitalize properly
-        merchant = merchant.split(' ').map(w => 
-          w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
-        ).join(' ')
-      }
+    if (!match) continue
+
+    const value = match[0].trim()
+    const index = text.toLowerCase().indexOf(value.toLowerCase())
+    const score = 100 + (index < 120 ? 50 : 0) + value.length
+
+    if (score > bestScore) {
+      bestScore = score
+      merchant = toTitleCase(value)
     }
   }
-  
-  if (merchant) {
-    console.log('Merchant found (pattern):', merchant, 'score:', bestScore)
+
+  if (merchant) return merchant
+
+  for (const line of lines.slice(0, 6)) {
+    const isStoreLike =
+      line.length >= 3 &&
+      line.length <= 45 &&
+      /[a-z]/i.test(line) &&
+      !/^(struk|nota|invoice|receipt|kasir|cashier)$/i.test(line) &&
+      !/^(jl\.|jalan|alamat|telp|phone|fax|no\.)/i.test(line) &&
+      !/^\d+$/.test(line)
+
+    if (isStoreLike) return line
   }
-  
-  // If no merchant found, check first 5 lines for store name
-  if (!merchant) {
-    for (let i = 0; i < Math.min(5, lines.length); i++) {
-      const line = lines[i].trim()
-      
-      // Store name validation:
-      // - Length: 3-40 chars
-      // - Must contain letters
-      // - Not just numbers
-      // - Not address/phone/date
-      const isValidLength = line.length >= 3 && line.length <= 40
-      const hasLetters = /[a-z]/i.test(line)
-      const notJustNumbers = !/^\d+$/.test(line)
-      const notAddress = !/jl\.|jalan|street|no\.|telp|phone|fax/i.test(line)
-      const notDate = !/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(line)
-      const notBarcode = !/^[\d\*\#\-]{8,}$/.test(line)
-      
-      // Skip common header words
-      const skipWords = ['struk', 'nota', 'invoice', 'receipt', 'bill', 'kasir', 'cashier']
-      const notSkipWord = !skipWords.some(word => line.toLowerCase().includes(word))
-      
-      if (isValidLength && hasLetters && notJustNumbers && notAddress && notDate && notBarcode && notSkipWord) {
-        merchant = line
-        console.log('Merchant found (line', i + 1, '):', merchant)
-        break
-      }
-    }
+
+  return null
+}
+
+function extractDate(text: string): string | null {
+  const patterns = [
+    /\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b/,
+    /\b(\d{4}[/-]\d{1,2}[/-]\d{1,2})\b/,
+    /\b(\d{1,2}\s+(?:jan|feb|mar|apr|mei|may|jun|jul|agu|aug|sep|okt|oct|nov|des|dec)[a-z]*\s+\d{2,4})\b/i,
+  ]
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    if (match) return match[1]
   }
-  
-  // Extract total amount - IMPROVED WITH CONTEXT SCORING
+
+  return null
+}
+
+function extractTotal(text: string, lines: string[]): number {
   let total = 0
-  let bestTotalScore = 0
-  
-  const totalPatterns = [
-    // Most reliable: explicit "total" keyword
-    { pattern: /(?:total|grand\s*total)\s*:?\s*rp\.?\s*([\d.,]+)/i, score: 100 },
-    { pattern: /(?:jumlah|bayar|dibayar|total\s*bayar)\s*:?\s*rp\.?\s*([\d.,]+)/i, score: 95 },
-    { pattern: /(?:harga\s*jual|total\s*harga)\s*:?\s*rp\.?\s*([\d.,]+)/i, score: 90 },
-    
-    // Medium reliability: "total" near number
-    { pattern: /total[\s\S]{0,15}?([\d.,]{5,})/i, score: 70 },
-    
-    // Lower reliability: just "Rp" with large number
-    { pattern: /rp\.?\s*([\d.,]{5,})\s*$/im, score: 50 },
-  ]
-  
-  for (const { pattern, score } of totalPatterns) {
+  let bestScore = 0
+
+  for (const { pattern, score } of TOTAL_PATTERNS) {
     const match = text.match(pattern)
-    if (match) {
-      const amountStr = match[1]
-      const amount = parseAmount(amountStr)
-      
-      // Validate amount is reasonable for receipt (1k - 10M)
-      if (amount >= 1000 && amount <= 10000000) {
-        // Additional scoring based on context
-        let contextScore = score
-        
-        // Boost score if found in last 30% of text (totals usually at bottom)
-        const matchPos = text.indexOf(match[0])
-        if (matchPos > text.length * 0.7) {
-          contextScore += 20
-        }
-        
-        // Boost score if amount is larger (total usually largest number)
-        if (amount > 50000) contextScore += 10
-        if (amount > 100000) contextScore += 10
-        
-        if (contextScore > bestTotalScore) {
-          bestTotalScore = contextScore
-          total = amount
-          console.log('Total candidate:', amount, 'score:', contextScore, 'pattern:', pattern.source.substring(0, 40))
-        }
-      }
+    if (!match) continue
+
+    const amount = parseAmount(match[1])
+    if (amount < 100 || amount > 100_000_000) continue
+
+    const index = text.indexOf(match[0])
+    const positionBoost = index > text.length * 0.6 ? 20 : 0
+    const currentScore = score + positionBoost
+
+    if (currentScore > bestScore) {
+      bestScore = currentScore
+      total = amount
     }
   }
-  
-  // Fallback: Find largest reasonable number in bottom half
-  if (total === 0) {
-    const textLines = text.split('\n')
-    const bottomHalfStart = Math.floor(textLines.length / 2)
-    const bottomHalf = textLines.slice(bottomHalfStart).join('\n')
-    
-    const allNumbers = bottomHalf.match(/[\d.,]{4,}/g) || []
-    const amounts = allNumbers
-      .map(n => parseAmount(n))
-      .filter(n => n >= 1000 && n <= 10000000) // Reasonable receipt range
-      .sort((a, b) => b - a) // Sort descending
-    
-    if (amounts.length > 0) {
-      total = amounts[0] // Take largest from bottom half
-      console.log('Using largest number from bottom half:', total)
-    }
+
+  if (total > 0) return total
+
+  const bottomHalf = lines.slice(Math.floor(lines.length / 2)).join('\n')
+  const amounts = (bottomHalf.match(/(?:rp\.?\s*)?[\d.,]{4,}/gi) ?? [])
+    .map(parseAmount)
+    .filter((amount) => amount >= 100 && amount <= 100_000_000)
+    .sort((a, b) => b - a)
+
+  return amounts[0] ?? 0
+}
+
+function isUtilityReceipt(text: string): boolean {
+  return /\b(pln|token|stroom|kwh|idpel|id\s*pel|no\.?\s*meter|listrik|pdam|pulsa|internet|wifi|indihome)\b/i.test(text)
+}
+
+function syntheticUtilityItem(text: string, total: number): ReceiptItem {
+  const category = categorizeTransactionText(text).category
+  let name = 'Tagihan'
+
+  if (/\b(pln|token|stroom|kwh|listrik)\b/i.test(text)) {
+    name = 'Token Listrik'
+  } else if (/\b(pdam|air)\b/i.test(text)) {
+    name = 'Tagihan Air'
+  } else if (/\b(pulsa)\b/i.test(text)) {
+    name = 'Pulsa'
+  } else if (/\b(internet|wifi|indihome)\b/i.test(text)) {
+    name = 'Tagihan Internet'
   }
-  
-  if (total > 0) {
-    console.log('Final total:', total, 'score:', bestTotalScore)
-  }
-  
-  // Extract items - IMPROVED
-  const items: ReceiptItem[] = []
-  const itemPatterns = [
-    // Pattern: name qty x price (e.g., "Indomie 2 x 3000")
-    /^(.+?)\s+(\d+)\s*x\s*rp?\.?\s*([\d.,]+)/i,
-    // Pattern: name price qty (e.g., "Indomie 3000 2")
-    /^(.+?)\s+rp?\.?\s*([\d.,]+)\s+(\d+)\s*$/i,
-    // Pattern: name price (e.g., "Indomie 3000")
-    /^(.+?)\s+rp?\.?\s*([\d.,]+)\s*$/i,
-    // Pattern: name @ price (e.g., "Indomie @ 3000")
-    /^(.+?)\s*@\s*rp?\.?\s*([\d.,]+)/i,
-  ]
-  
-  for (const line of lines) {
-    const trimmed = line.trim()
-    
-    // Skip empty or very short lines
-    if (trimmed.length < 3) continue
-    
-    // EXPANDED: Skip lines that are clearly not items
-    const skipPatterns = [
-      // Totals & calculations
-      /^(total|subtotal|grand total|pajak|tax|ppn|diskon|discount|potongan|kembalian|change|tunai|cash|kartu|card|debit|credit)/i,
-      
-      // Cancelled/void items
-      /cancel|batal|void|dibatalkan|cancelled/i,
-      
-      // Store info
-      /^(jl\.|jalan|street|no\.|alamat|address|telp|phone|fax|email|website|www)/i,
-      
-      // Promo & marketing
-      /^(promo|diskon|hemat|cashback|poin|point|member|dapatkan|terima|selamat|welcome|thank|thanks|terima kasih)/i,
-      
-      // Receipt metadata
-      /^(kasir|cashier|operator|struk|receipt|nota|invoice|no\s*trans|transaksi|transaction)/i,
-      
-      // Date & time (standalone)
-      /^[\d\s\-:\/]+$/,
-      
-      // Barcode & codes
-      /^[\d\*\#\-]{10,}$/,
-      
-      // Social media & website
-      /^(ig|instagram|fb|facebook|twitter|tiktok|@|follow|like)/i,
-      
-      // Common footer text
-      /^(barang|yang|sudah|dibeli|tidak|dapat|ditukar|kembali|goods|sold|cannot|be|returned)/i,
-      
-      // Very long lines (likely address or promo text)
-      /^.{60,}$/,
-      
-      // Lines with mostly symbols
-      /^[\*\-=_\s]{3,}$/,
-    ]
-    
-    let shouldSkip = false
-    for (const pattern of skipPatterns) {
-      if (pattern.test(trimmed)) {
-        shouldSkip = true
-        break
-      }
-    }
-    
-    if (shouldSkip) continue
-    
-    for (const pattern of itemPatterns) {
-      const match = trimmed.match(pattern)
-      if (match) {
-        let name = match[1].trim()
-        let quantity = 1
-        let price = 0
-        
-        // Parse based on pattern
-        if (pattern.source.includes('x')) {
-          // Pattern with 'x': name qty x price
-          quantity = parseInt(match[2]) || 1
-          price = parseAmount(match[3])
-        } else if (match.length === 4) {
-          // Pattern: name price qty
-          price = parseAmount(match[2])
-          quantity = parseInt(match[3]) || 1
-        } else {
-          // Pattern: name price
-          price = parseAmount(match[2])
-        }
-        
-        // Clean up name
-        name = name.replace(/^[\d\s\-*]+/, '').trim() // Remove leading numbers/symbols
-        name = name.replace(/\s+/g, ' ') // Normalize spaces
-        
-        // Additional name validation - skip if contains noise keywords
-        const noiseKeywords = [
-          'promo', 'diskon', 'hemat', 'gratis', 'free', 'bonus',
-          'member', 'poin', 'point', 'cashback',
-          'jalan', 'alamat', 'telp', 'phone',
-          'kasir', 'operator', 'struk', 'nota',
-          'terima kasih', 'thank', 'selamat', 'welcome'
-        ]
-        
-        const hasNoise = noiseKeywords.some(keyword => 
-          name.toLowerCase().includes(keyword)
-        )
-        
-        if (hasNoise) continue
-        
-        // Validate item
-        const isValidName = name.length >= 3 && name.length <= 50
-        const isValidPrice = price >= 100 && price <= 1000000
-        const isValidQty = quantity >= 1 && quantity <= 100
-        const hasLetters = /[a-z]/i.test(name) // Must contain letters
-        
-        if (isValidName && isValidPrice && isValidQty && hasLetters) {
-          const category = categorizeItem(name)
-          items.push({ name, quantity, price, category })
-          console.log('Item found:', { name, quantity, price, category })
-          break // Found match, move to next line
-        }
-      }
-    }
-  }
-  
-  console.log('Total items extracted:', items.length)
-  
-  // Extract date
-  const datePatterns = [
-    /(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/,
-    /(\d{4}[/-]\d{1,2}[/-]\d{1,2})/,
-  ]
-  
-  let date: string | null = null
-  for (const pattern of datePatterns) {
-    const match = text.match(pattern)
-    if (match) {
-      date = match[1]
-      break
-    }
-  }
-  
-  // Calculate confidence based on what we found
-  let confidence = 0
-  if (merchant) confidence += 0.2
-  if (total > 0) confidence += 0.5
-  if (items.length > 0) confidence += 0.2
-  if (date) confidence += 0.1
-  
-  console.log('=== OCR PARSING END ===')
-  console.log('Result:', { merchant, total, itemCount: items.length, confidence })
-  
+
   return {
-    merchant,
+    name,
+    quantity: 1,
+    price: total,
+    category,
+  }
+}
+
+function extractItems(lines: string[], rawText: string, total: number): ReceiptItem[] {
+  if (total > 0 && isUtilityReceipt(rawText)) {
+    return [syntheticUtilityItem(rawText, total)]
+  }
+
+  const items: ReceiptItem[] = []
+  let pendingName: string | null = null
+
+  for (const line of lines) {
+    if (line.length < 4 || line.length > 70) continue
+    if (SKIP_ITEM_LINE_PATTERNS.some((pattern) => pattern.test(line))) continue
+
+    const lineWithPendingName = pendingName ? `${pendingName} ${line}` : line
+    const parsed = parseItemLine(lineWithPendingName) ?? parseItemLine(line)
+
+    if (parsed) {
+      items.push({
+        ...parsed,
+        category: categorizeTransactionText(parsed.name).category,
+      })
+      pendingName = null
+      continue
+    }
+
+    if (isPotentialItemName(line)) {
+      pendingName = line
+    }
+  }
+
+  return items
+}
+
+function parseItemLine(line: string): Omit<ReceiptItem, 'category'> | null {
+  const normalized = line.replace(/\s+/g, ' ').trim()
+
+  const trailingPriceMatch = normalized.match(/^(.*?)\s+(?:rp\.?\s*)?([\d.,]{4,})$/i)
+  if (!trailingPriceMatch) return null
+
+  let namePart = trailingPriceMatch[1].trim()
+  const price = parseAmount(trailingPriceMatch[2])
+  if (price < 100 || price > 10_000_000) return null
+
+  let quantity = 1
+
+  const leadingQtyMatch = namePart.match(/^(\d{1,2})\s+(.+)$/)
+  if (leadingQtyMatch) {
+    quantity = Number.parseInt(leadingQtyMatch[1], 10) || 1
+    namePart = leadingQtyMatch[2].trim()
+  }
+
+  const trailingQtyMatch = namePart.match(/^(.+?)\s+(\d{1,2})\s*x$/i)
+  if (trailingQtyMatch) {
+    namePart = trailingQtyMatch[1].trim()
+    quantity = Number.parseInt(trailingQtyMatch[2], 10) || quantity
+  } else {
+    namePart = namePart.replace(/\s+x$/i, '').trim()
+  }
+
+  const name = cleanItemName(namePart)
+  if (!isValidItemName(name) || quantity < 1 || quantity > 100) return null
+
+  return { name, quantity, price }
+}
+
+function cleanItemName(name: string): string {
+  return name
+    .replace(/^[\d\s\-*.]+/, '')
+    .replace(/\b(?:rp|idr)\b\.?/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isValidItemName(name: string): boolean {
+  if (name.length < 3 || name.length > 50 || !/[a-z]/i.test(name)) return false
+  if (/^(x|pcs?|piece|buah|botol|btl|ml|ltr|liter|gr|gram|kg|lusin|dozen)$/i.test(name)) return false
+  if (/\b(sub\s*total|total|bayar|dibayar|cash|tunai|debit|credit|kembalian|pajak|tax|ppn|token|kwh|idpel|id\s*pel|no\.?\s*meter)\b/i.test(name)) return false
+  return true
+}
+
+function isPotentialItemName(line: string): boolean {
+  const name = cleanItemName(line)
+  if (!isValidItemName(name)) return false
+  if (/\d{4,}/.test(name)) return false
+  if (SKIP_ITEM_LINE_PATTERNS.some((pattern) => pattern.test(name))) return false
+  return true
+}
+
+function calculateConfidence(receipt: Omit<ReceiptData, 'confidence'>): number {
+  let confidence = 0
+  if (receipt.merchant) confidence += 0.2
+  if (receipt.date) confidence += 0.1
+  if (receipt.total > 0) confidence += 0.5
+  if (receipt.items.length > 0) confidence += 0.2
+  return Math.round(confidence * 100) / 100
+}
+
+export function parseReceiptText(text: string): ReceiptData {
+  const rawText = text.trim()
+  if (!rawText) {
+    throw new Error('Tidak ada teks yang bisa diproses dari gambar struk')
+  }
+
+  const lines = normalizeLines(rawText)
+  const total = extractTotal(rawText, lines)
+  const receiptWithoutConfidence = {
+    merchant: extractMerchant(rawText, lines),
     total,
-    items,
-    date,
-    confidence: Math.round(confidence * 100) / 100,
-    rawText: text
+    items: extractItems(lines, rawText, total),
+    date: extractDate(rawText),
+    rawText,
+  }
+
+  return {
+    ...receiptWithoutConfidence,
+    confidence: calculateConfidence(receiptWithoutConfidence),
   }
 }
 
-/**
- * Parse amount string to number - IMPROVED
- */
-function parseAmount(amountStr: string): number {
-  if (!amountStr) return 0
-  
-  // Remove all non-digit characters except dots and commas
-  let cleaned = amountStr.replace(/[^\d.,]/g, '')
-  
-  // Handle Indonesian number format: 1.234.567,89 or 1,234,567.89
-  // Count dots and commas to determine format
-  const dotCount = (cleaned.match(/\./g) || []).length
-  const commaCount = (cleaned.match(/,/g) || []).length
-  
-  if (dotCount > 1) {
-    // Format: 1.234.567 (dots as thousands separator)
-    cleaned = cleaned.replace(/\./g, '')
-  } else if (commaCount > 1) {
-    // Format: 1,234,567 (commas as thousands separator)
-    cleaned = cleaned.replace(/,/g, '')
-  } else if (dotCount === 1 && commaCount === 1) {
-    // Format: 1.234,56 or 1,234.56
-    const dotPos = cleaned.indexOf('.')
-    const commaPos = cleaned.indexOf(',')
-    if (dotPos < commaPos) {
-      // 1.234,56 → remove dot, replace comma with dot
-      cleaned = cleaned.replace('.', '').replace(',', '.')
-    } else {
-      // 1,234.56 → remove comma
-      cleaned = cleaned.replace(',', '')
+export async function processReceiptWithTesseract(imageBase64: string): Promise<ReceiptData> {
+  const { recognize } = await import('tesseract.js')
+  const buffer = Buffer.from(imageBase64, 'base64')
+
+  try {
+    const result = await recognize(buffer, 'ind+eng', {
+      logger: (info) => {
+        if (info.status === 'recognizing text') {
+          console.log(`Tesseract OCR progress: ${Math.round((info.progress ?? 0) * 100)}%`)
+        }
+      },
+    })
+
+    const text = result.data.text?.trim()
+    if (!text) {
+      throw new Error('Tesseract tidak menemukan teks di gambar struk')
     }
-  } else if (commaCount === 1) {
-    // Could be decimal or thousands
-    const parts = cleaned.split(',')
-    if (parts[1] && parts[1].length <= 2) {
-      // Likely decimal: 12,50
-      cleaned = cleaned.replace(',', '.')
-    } else {
-      // Likely thousands: 1,234
-      cleaned = cleaned.replace(',', '')
-    }
+
+    return parseReceiptText(text)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'OCR lokal gagal memproses gambar'
+    throw new Error(message)
   }
-  
-  const result = parseFloat(cleaned) || 0
-  console.log('Parse amount:', amountStr, '→', result)
-  return Math.round(result)
 }
 
-/**
- * Categorize item based on name
- */
-function categorizeItem(itemName: string): string {
-  const lower = itemName.toLowerCase()
-  
-  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    for (const keyword of keywords) {
-      if (lower.includes(keyword)) {
-        return category
-      }
-    }
+export async function processReceipt(imageBase64: string): Promise<ProcessedReceipt> {
+  const receipt = await processReceiptWithTesseract(imageBase64)
+  return {
+    ...receipt,
+    ocrEngine: 'tesseract',
   }
-  
-  return "Lainnya"
 }
 
-/**
- * Convert File to base64 (Server-side compatible)
- */
 export async function fileToBase64(file: File): Promise<string> {
   const bytes = await file.arrayBuffer()
-  const buffer = Buffer.from(bytes)
-  return buffer.toString('base64')
+  return Buffer.from(bytes).toString('base64')
 }

@@ -38,10 +38,10 @@ export const id = {
   auth: {
     login: 'Masuk',
     logout: 'Keluar',
-    loginWithTelegram: 'Masuk dengan Telegram',
-    loginDescription: 'Gunakan Telegram untuk masuk ke akun Anda',
-    loginButton: 'Buka Telegram Bot',
-    loginInstructions: 'Klik tombol di bawah untuk membuka bot Telegram dan mulai mencatat keuangan Anda',
+    loginWithTelegram: 'Masuk dengan Akun Demo',
+    loginDescription: 'Gunakan akun demo untuk masuk ke dashboard',
+    loginButton: 'Masuk Demo',
+    loginInstructions: 'Gunakan ID dan password demo yang tertera di halaman login',
   },
 
   dashboard: {

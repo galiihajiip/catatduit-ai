@@ -10,7 +10,7 @@ interface SidebarProps {
   isOpen: boolean
   onToggle: () => void
   userName?: string
-  telegramId?: string
+  userId?: string
   onLogout?: () => void
 }
 
@@ -29,7 +29,7 @@ export default function Sidebar({
   isOpen, 
   onToggle,
   userName,
-  telegramId,
+  userId,
   onLogout
 }: SidebarProps) {
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -82,7 +82,7 @@ export default function Sidebar({
         </div>
 
         {/* User Profile */}
-        {telegramId && (
+        {userId && (
           <div className="px-4 py-4 border-b border-gray-100">
             <button 
               onClick={() => setShowUserMenu(!showUserMenu)}
@@ -93,7 +93,7 @@ export default function Sidebar({
               </div>
               <div className="flex-1 text-left">
                 <p className="font-medium text-text-primary text-sm">{userName || 'User'}</p>
-                <p className="text-xs text-text-secondary">ID: {telegramId}</p>
+                <p className="text-xs text-text-secondary">Demo ID: {userId}</p>
               </div>
               <Icons.chevronDown className={`w-4 h-4 text-text-secondary transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
             </button>
@@ -139,19 +139,6 @@ export default function Sidebar({
         
         {/* Social Links */}
         <div className="px-4 pb-2 space-y-2">
-          <a
-            href="https://t.me/catatduitgalih_bot"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-accent-blue/10 to-blue-500/10 text-accent-blue rounded-xl hover:from-accent-blue/20 hover:to-blue-500/20 transition-all"
-          >
-            <Icons.telegram className="w-5 h-5" />
-            <div>
-              <p className="font-medium text-sm">Telegram Bot</p>
-              <p className="text-xs opacity-80">Chat untuk catat</p>
-            </div>
-          </a>
-          
           <a
             href="https://instagram.com/catatin.duit"
             target="_blank"

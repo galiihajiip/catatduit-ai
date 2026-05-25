@@ -27,6 +27,9 @@ dist/
 *.log
 npm-debug.log*
 
+# OCR runtime cache/data
+*.traineddata
+
 # OS
 .DS_Store
 Thumbs.db

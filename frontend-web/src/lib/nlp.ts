@@ -1,7 +1,7 @@
-// Indonesian NLP Engine for parsing financial text
+export type TransactionIntent = 'expense' | 'income' | 'transfer'
 
-interface ParsedTransaction {
-  intent: 'expense' | 'income' | 'transfer'
+export interface ParsedTransaction {
+  intent: TransactionIntent
   amount: number
   category: string
   wallet: string | null
@@ -9,117 +9,199 @@ interface ParsedTransaction {
   confidence: number
 }
 
-const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  'Makanan': ['bakso', 'nasi', 'makan', 'kopi', 'jajan', 'mie', 'ayam', 'sate', 'gorengan', 'es', 'teh', 'minuman', 'snack', 'cemilan', 'sarapan', 'lunch', 'dinner', 'breakfast', 'gofood', 'grabfood'],
-  'Tagihan': ['listrik', 'air', 'wifi', 'internet', 'pulsa', 'token', 'pln', 'indihome', 'telkom', 'gas', 'pdam', 'kos', 'sewa', 'cicilan'],
-  'Transportasi': ['bensin', 'parkir', 'ojol', 'gojek', 'grab', 'taxi', 'bus', 'kereta', 'mrt', 'lrt', 'toll', 'tol', 'bbm', 'pertamax'],
-  'Keperluan Rumah Tangga': ['sabun', 'sikat gigi', 'detergen', 'shampo', 'pasta gigi', 'tissue', 'pel', 'sapu', 'ember'],
-  'Pemasukan': ['gaji', 'salary', 'honor', 'bonus', 'transfer masuk', 'terima', 'dapat', 'freelance', 'proyek', 'dividen'],
-  'Belanja': ['beli', 'belanja', 'shopping', 'mall', 'toko', 'online', 'shopee', 'tokped', 'lazada'],
-  'Hiburan': ['nonton', 'bioskop', 'game', 'spotify', 'netflix', 'youtube', 'konser'],
-  'Kesehatan': ['obat', 'dokter', 'rumah sakit', 'apotek', 'vitamin'],
+interface KeywordRule {
+  category: string
+  keywords: string[]
 }
 
+const CATEGORY_RULES: KeywordRule[] = [
+  {
+    category: 'Makanan',
+    keywords: [
+      'makan',
+      'makanan',
+      'resto',
+      'restaurant',
+      'restoran',
+      'warung',
+      'kopi',
+      'cafe',
+      'bakso',
+      'telor',
+      'telur',
+      'telor gulung',
+      'telur gulung',
+      'cilok',
+      'cireng',
+      'seblak',
+      'martabak',
+      'gorengan',
+      'nasi',
+      'mie',
+      'ayam',
+      'sate',
+      'roti',
+      'bread',
+      'breadtalk',
+      'croissant',
+      'cream',
+      'brulee',
+      'bruille',
+      'pastry',
+      'cake',
+      'kue',
+      'bakery',
+      'snack',
+      'jajan',
+      'minum',
+      'gofood',
+      'grabfood',
+    ],
+  },
+  {
+    category: 'Transportasi',
+    keywords: ['bensin', 'bbm', 'pertamax', 'solar', 'parkir', 'parkir liar', 'tol', 'toll', 'ojek', 'ojol', 'gojek', 'grab', 'taxi', 'kereta', 'mrt', 'lrt', 'bus'],
+  },
+  {
+    category: 'Tagihan',
+    keywords: ['listrik', 'pln', 'kwh', 'token', 'stroom', 'prepaid', 'air', 'pdam', 'wifi', 'internet', 'pulsa', 'indihome', 'telkom', 'sewa', 'kos', 'cicilan'],
+  },
+  {
+    category: 'Keperluan Rumah Tangga',
+    keywords: ['sabun', 'detergen', 'shampo', 'sikat gigi', 'pasta gigi', 'tissue', 'dapur', 'pel', 'sapu', 'ember'],
+  },
+  {
+    category: 'Belanja',
+    keywords: ['belanja', 'beli', 'mall', 'toko', 'market', 'minimarket', 'indomaret', 'alfamart', 'shopee', 'tokopedia', 'tokped', 'lazada'],
+  },
+  {
+    category: 'Hiburan',
+    keywords: ['nonton', 'bioskop', 'cinema', 'game', 'spotify', 'netflix', 'youtube', 'konser', 'karaoke'],
+  },
+  {
+    category: 'Kesehatan',
+    keywords: ['obat', 'dokter', 'rumah sakit', 'klinik', 'apotek', 'vitamin', 'medical', 'health'],
+  },
+]
+
 const WALLET_KEYWORDS: Record<string, string[]> = {
-  'GoPay': ['gopay', 'go-pay'],
-  'OVO': ['ovo'],
-  'Dana': ['dana'],
-  'ShopeePay': ['shopeepay', 'shopee pay'],
+  GoPay: ['gopay', 'go-pay'],
+  OVO: ['ovo'],
+  Dana: ['dana'],
+  ShopeePay: ['shopeepay', 'shopee pay'],
   'Bank BCA': ['bca'],
   'Bank BRI': ['bri'],
   'Bank Mandiri': ['mandiri'],
-  'Cash': ['cash', 'tunai', 'kas'],
+  Cash: ['cash', 'tunai', 'kas'],
 }
 
-const INCOME_KEYWORDS = ['dapat', 'terima', 'masuk', 'gaji', 'honor', 'bonus', 'transfer masuk']
-const EXPENSE_KEYWORDS = ['beli', 'bayar', 'buat', 'untuk', 'habis', 'keluar', 'spend']
-const TRANSFER_KEYWORDS = ['transfer', 'kirim', 'pindah', 'tf']
+const INCOME_KEYWORDS = ['gaji', 'salary', 'honor', 'bonus', 'dapat', 'terima', 'masuk', 'freelance', 'proyek', 'dividen']
+const TRANSFER_KEYWORDS = ['transfer', 'kirim', 'pindah saldo', 'tf']
+const EXPENSE_KEYWORDS = ['beli', 'bayar', 'buat', 'untuk', 'habis', 'keluar', 'spend', 'belanja']
 
-export function parseTransaction(text: string): ParsedTransaction {
-  const lower = text.toLowerCase().trim()
-  
-  // Extract intent
-  let intent: 'expense' | 'income' | 'transfer' = 'expense'
-  let intentConf = 0.7
-  
-  for (const kw of INCOME_KEYWORDS) {
-    if (lower.includes(kw)) { intent = 'income'; intentConf = 0.95; break }
-  }
-  for (const kw of TRANSFER_KEYWORDS) {
-    if (lower.includes(kw)) { intent = 'transfer'; intentConf = 0.9; break }
-  }
-  for (const kw of EXPENSE_KEYWORDS) {
-    if (lower.includes(kw)) { intent = 'expense'; intentConf = 0.95; break }
-  }
-  
-  // Extract amount
-  let amount = 0
-  let amountConf = 0
-  
-  // Pattern: 15rb, 15k, 15ribu
-  const rbMatch = lower.match(/(\d+)\s*(?:rb|ribu|k)/i)
-  if (rbMatch) {
-    amount = parseInt(rbMatch[1]) * 1000
-    amountConf = 0.95
-  }
-  
-  // Pattern: 1.5jt, 1jt, 1juta
-  const jtMatch = lower.match(/(\d+(?:[.,]\d+)?)\s*(?:jt|juta)/i)
-  if (jtMatch) {
-    amount = parseFloat(jtMatch[1].replace(',', '.')) * 1000000
-    amountConf = 0.95
-  }
-  
-  // Pattern: plain number 15000, 1500000
-  if (amount === 0) {
-    const numMatch = lower.match(/(\d{4,})/);
-    if (numMatch) {
-      amount = parseInt(numMatch[1])
-      amountConf = 0.85
+function normalizeText(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+function hasKeyword(text: string, keyword: string): boolean {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`(^|\\W)${escaped}(\\W|$)`, 'i').test(text)
+}
+
+export function parseAmountFromText(text: string): { amount: number; confidence: number } {
+  const normalized = normalizeText(text)
+
+  const jutaMatch = normalized.match(/\b(\d+(?:[.,]\d+)?)\s*(?:jt|juta)\b/i)
+  if (jutaMatch) {
+    return {
+      amount: Math.round(Number.parseFloat(jutaMatch[1].replace(',', '.')) * 1_000_000),
+      confidence: 0.95,
     }
   }
-  
-  // Extract category
-  let category = 'Lainnya'
-  let catConf = 0.5
-  
-  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    for (const kw of keywords) {
-      if (lower.includes(kw)) {
-        category = cat
-        catConf = 0.95
-        break
-      }
+
+  const ribuMatch = normalized.match(/\b(\d+(?:[.,]\d+)?)\s*(?:rb|ribu|k)\b/i)
+  if (ribuMatch) {
+    return {
+      amount: Math.round(Number.parseFloat(ribuMatch[1].replace(',', '.')) * 1_000),
+      confidence: 0.95,
     }
-    if (catConf > 0.5) break
   }
-  
-  if (intent === 'income' && category === 'Lainnya') {
-    category = 'Pemasukan'
-    catConf = 0.8
-  }
-  
-  // Extract wallet
-  let wallet: string | null = null
-  for (const [w, keywords] of Object.entries(WALLET_KEYWORDS)) {
-    for (const kw of keywords) {
-      if (lower.includes(kw)) {
-        wallet = w
-        break
-      }
+
+  const rupiahMatch = normalized.match(/\b(?:rp\.?\s*)?(\d{1,3}(?:[.,]\d{3})+|\d{4,})\b/i)
+  if (rupiahMatch) {
+    const value = rupiahMatch[1].replace(/[.,]/g, '')
+    return {
+      amount: Number.parseInt(value, 10) || 0,
+      confidence: 0.8,
     }
-    if (wallet) break
   }
-  
-  // Calculate confidence
-  const confidence = (intentConf * 0.3) + (amountConf * 0.4) + (catConf * 0.3)
-  
+
+  return { amount: 0, confidence: 0 }
+}
+
+export function detectIntent(text: string): { intent: TransactionIntent; confidence: number } {
+  const normalized = normalizeText(text)
+
+  if (INCOME_KEYWORDS.some((keyword) => hasKeyword(normalized, keyword))) {
+    return { intent: 'income', confidence: 0.95 }
+  }
+
+  if (TRANSFER_KEYWORDS.some((keyword) => hasKeyword(normalized, keyword))) {
+    return { intent: 'transfer', confidence: 0.9 }
+  }
+
+  if (EXPENSE_KEYWORDS.some((keyword) => hasKeyword(normalized, keyword))) {
+    return { intent: 'expense', confidence: 0.9 }
+  }
+
+  return { intent: 'expense', confidence: 0.65 }
+}
+
+export function categorizeTransactionText(text: string): { category: string; confidence: number } {
+  const normalized = normalizeText(text)
+
+  for (const rule of CATEGORY_RULES) {
+    if (rule.keywords.some((keyword) => hasKeyword(normalized, keyword))) {
+      return { category: rule.category, confidence: 0.95 }
+    }
+  }
+
+  return { category: 'Lainnya', confidence: 0.45 }
+}
+
+export function detectWallet(text: string): string | null {
+  const normalized = normalizeText(text)
+
+  for (const [wallet, keywords] of Object.entries(WALLET_KEYWORDS)) {
+    if (keywords.some((keyword) => hasKeyword(normalized, keyword))) {
+      return wallet
+    }
+  }
+
+  return null
+}
+
+export function parseTransaction(text: string, amountOverride?: number): ParsedTransaction {
+  const intentResult = detectIntent(text)
+  const amountResult = amountOverride && amountOverride > 0
+    ? { amount: amountOverride, confidence: 1 }
+    : parseAmountFromText(text)
+  const categoryResult =
+    intentResult.intent === 'income'
+      ? { category: 'Pemasukan', confidence: 0.85 }
+      : categorizeTransactionText(text)
+
+  const confidence =
+    intentResult.confidence * 0.3 +
+    amountResult.confidence * 0.4 +
+    categoryResult.confidence * 0.3
+
   return {
-    intent,
-    amount,
-    category,
-    wallet,
-    description: text,
-    confidence: Math.round(confidence * 100) / 100
+    intent: intentResult.intent,
+    amount: amountResult.amount,
+    category: categoryResult.category,
+    wallet: detectWallet(text),
+    description: text.trim(),
+    confidence: Math.round(confidence * 100) / 100,
   }
 }

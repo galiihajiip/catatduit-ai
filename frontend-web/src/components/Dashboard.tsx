@@ -39,6 +39,9 @@ export default function Dashboard({
   const [showAllWallets, setShowAllWallets] = useState(false)
   const [trendPeriod, setTrendPeriod] = useState<'3' | '6' | '12'>('6')
   const [showAddWalletModal, setShowAddWalletModal] = useState(false)
+  const [quickText, setQuickText] = useState('')
+  const [quickLoading, setQuickLoading] = useState(false)
+  const [quickMessage, setQuickMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const totalBalance = analytics.wallets?.reduce((sum: number, w: any) => sum + w.balance, 0) || 0
   const sortedWallets = [...(analytics.wallets || [])].sort((a, b) => b.balance - a.balance)
@@ -66,6 +69,52 @@ export default function Dashboard({
 
   const totalTransactions = categoryFrequency.reduce((sum: number, c: any) => sum + c.transactions, 0)
   const topCategory = categoryFrequency[0]
+
+  const handleQuickSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setQuickMessage(null)
+
+    if (!userId) {
+      setQuickMessage({ type: 'error', text: 'Silakan login ulang sebelum mencatat transaksi.' })
+      return
+    }
+
+    if (!quickText.trim()) {
+      setQuickMessage({ type: 'error', text: 'Tulis transaksi dulu. Contoh: beli bakso 15rb cash.' })
+      return
+    }
+
+    setQuickLoading(true)
+    try {
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          text: quickText.trim(),
+        }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || 'Gagal mencatat transaksi')
+      }
+
+      setQuickText('')
+      setQuickMessage({
+        type: 'success',
+        text: `Tercatat: ${formatCurrency(data.parsed.amount)} untuk ${data.parsed.category}`,
+      })
+      onRefresh?.()
+    } catch (error) {
+      setQuickMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Gagal mencatat transaksi',
+      })
+    } finally {
+      setQuickLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -104,6 +153,42 @@ export default function Dashboard({
           </div>
         </div>
       </div>
+
+      <form onSubmit={handleQuickSubmit} className="bg-card rounded-2xl p-5 shadow-card border border-gray-100">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <Icons.messageCircle className="w-5 h-5 text-primary" />
+              <h2 className="font-bold text-text-primary">Catat Cepat Pakai Bahasa Sehari-hari</h2>
+            </div>
+            <p className="text-sm text-text-secondary mb-3">
+              Contoh: <span className="font-semibold">beli bakso 15rb cash</span>, <span className="font-semibold">gajian 5jt</span>, <span className="font-semibold">bayar bensin 50k bca</span>
+            </p>
+            <input
+              value={quickText}
+              onChange={(e) => setQuickText(e.target.value)}
+              placeholder="Tulis transaksi di sini..."
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 font-medium text-gray-950 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={quickLoading}
+            className="rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-primary-light disabled:opacity-60"
+          >
+            {quickLoading ? 'Mencatat...' : 'Catat'}
+          </button>
+        </div>
+        {quickMessage && (
+          <div className={`mt-4 rounded-xl px-4 py-3 text-sm font-semibold ${
+            quickMessage.type === 'success'
+              ? 'bg-primary/10 text-primary'
+              : 'bg-accent-red/10 text-accent-red'
+          }`}>
+            {quickMessage.text}
+          </div>
+        )}
+      </form>
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

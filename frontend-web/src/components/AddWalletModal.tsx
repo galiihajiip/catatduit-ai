@@ -32,7 +32,7 @@ export default function AddWalletModal({ userId, onClose, onSuccess }: AddWallet
     setLoading(true)
 
     try {
-      // Get user UUID from telegram_id
+      // The current schema stores the demo user key in telegram_id for compatibility.
       const { data: user, error: userError } = await supabase
         .from('users')
         .select('id')
@@ -51,7 +51,7 @@ export default function AddWalletModal({ userId, onClose, onSuccess }: AddWallet
       const { error } = await supabase
         .from('wallets')
         .insert({
-          user_id: user.id, // Use UUID, not telegram_id
+          user_id: user.id,
           name: walletName,
           balance: initialBalance,
           color_hex: color,

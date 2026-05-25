@@ -22,9 +22,9 @@ echo.
 echo Server will run at: http://localhost:3000
 echo.
 echo NEXT STEPS:
-echo 1. Open new terminal and run: ngrok http 3000
-echo 2. Copy ngrok URL (e.g., https://abc123.ngrok.io)
-echo 3. Update Telegram webhook with that URL
+echo 1. Open http://localhost:3000
+echo 2. Login with demo / demo123
+echo 3. Upload a receipt from the dashboard
 echo.
 echo Press Ctrl+C to stop server
 echo.

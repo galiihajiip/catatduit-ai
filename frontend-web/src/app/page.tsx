@@ -9,6 +9,7 @@ import AddWalletModal from '@/components/AddWalletModal'
 import { UpgradeModal } from '@/components/ProBadge'
 import { Icons } from '@/components/Icons'
 import { formatCurrency } from '@/lib/utils'
+import { DEMO_ACCOUNT } from '@/lib/demo-auth'
 
 interface Analytics {
   summary: {
@@ -63,7 +64,7 @@ export default function Home() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [telegramId, setTelegramId] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const [userName, setUserName] = useState<string>('')
   const [analytics, setAnalytics] = useState<Analytics>(emptyAnalytics)
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -76,24 +77,23 @@ export default function Home() {
   const isPro = false
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const tid = params.get('telegram_id') || localStorage.getItem('telegram_id')
-    const name = localStorage.getItem('user_name') || 'User'
+    const uid = localStorage.getItem('demo_user_id')
+    const name = localStorage.getItem('demo_user_name') || DEMO_ACCOUNT.displayName
     
-    if (tid) {
-      setTelegramId(tid)
+    if (uid) {
+      setUserId(uid)
       setUserName(name)
       setIsLoggedIn(true)
-      fetchData(tid)
+      fetchData(uid)
     }
   }, [])
 
-  const fetchData = async (tid: string) => {
+  const fetchData = async (uid: string) => {
     setLoading(true)
     try {
       const [analyticsRes, txRes] = await Promise.all([
-        fetch(`/api/analytics?telegram_id=${tid}`),
-        fetch(`/api/transactions?telegram_id=${tid}`)
+        fetch(`/api/analytics?user_id=${uid}`),
+        fetch(`/api/transactions?user_id=${uid}`)
       ])
       
       if (analyticsRes.ok) {
@@ -115,21 +115,23 @@ export default function Home() {
     setLoading(false)
   }
 
-  const handleLogin = (tid: string) => {
-    setTelegramId(tid)
-    localStorage.setItem('telegram_id', tid)
+  const handleLogin = (uid: string, name: string) => {
+    setUserId(uid)
+    setUserName(name)
+    localStorage.setItem('demo_user_id', uid)
+    localStorage.setItem('demo_user_name', name)
     setIsLoggedIn(true)
-    window.history.pushState({}, '', `?telegram_id=${tid}`)
-    fetchData(tid)
+    window.history.pushState({}, '', '/')
+    fetchData(uid)
   }
 
   const handleLogout = () => {
-    setTelegramId(null)
+    setUserId(null)
     setIsLoggedIn(false)
     setAnalytics(emptyAnalytics)
     setTransactions([])
-    localStorage.removeItem('telegram_id')
-    localStorage.removeItem('user_name')
+    localStorage.removeItem('demo_user_id')
+    localStorage.removeItem('demo_user_name')
     window.history.pushState({}, '', '/')
   }
 
@@ -159,7 +161,7 @@ export default function Home() {
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         userName={userName}
-        telegramId={telegramId || undefined}
+        userId={userId || undefined}
         onLogout={handleLogout}
       />
       
@@ -176,23 +178,13 @@ export default function Home() {
             
             <div className="flex items-center gap-3">
               <button 
-                onClick={() => telegramId && fetchData(telegramId)}
+                onClick={() => userId && fetchData(userId)}
                 disabled={loading}
                 className="flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
               >
                 <Icons.refresh className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">Refresh</span>
               </button>
-              
-              <a
-                href="https://t.me/catatduitgalih_bot"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-2 text-sm bg-accent-blue/10 text-accent-blue rounded-xl hover:bg-accent-blue/20 transition-colors"
-              >
-                <Icons.telegram className="w-4 h-4" />
-                <span className="hidden sm:inline">Telegram</span>
-              </a>
               
               <button className="p-2 hover:bg-gray-100 rounded-xl transition-colors relative">
                 <Icons.bell className="w-5 h-5 text-text-secondary" />
@@ -211,16 +203,16 @@ export default function Home() {
               selectedYear={selectedYear}
               onMonthChange={setSelectedMonth}
               onYearChange={setSelectedYear}
-              onRefresh={() => telegramId && fetchData(telegramId)}
-              userId={telegramId || undefined}
+              onRefresh={() => userId && fetchData(userId)}
+              userId={userId || undefined}
             />
           )}
           
           {activeTab === 'wallets' && (
             <WalletsPage 
               wallets={analytics.wallets} 
-              telegramId={telegramId || undefined}
-              onRefresh={() => telegramId && fetchData(telegramId)}
+              userId={userId || undefined}
+              onRefresh={() => userId && fetchData(userId)}
             />
           )}
           
@@ -233,7 +225,7 @@ export default function Home() {
           )}
           
           {activeTab === 'settings' && (
-            <SettingsPage telegramId={telegramId} onLogout={handleLogout} />
+            <SettingsPage userId={userId} onLogout={handleLogout} />
           )}
         </div>
       </main>
@@ -244,10 +236,10 @@ export default function Home() {
       />
       
       {/* Receipt Scanner FAB */}
-      {isLoggedIn && telegramId && (
+      {isLoggedIn && userId && (
         <ReceiptScanner 
-          telegramId={telegramId} 
-          onSuccess={() => fetchData(telegramId)}
+          userId={userId} 
+          onSuccess={() => fetchData(userId)}
         />
       )}
     </div>
@@ -255,7 +247,7 @@ export default function Home() {
 }
 
 // Wallets Page Component
-function WalletsPage({ wallets, telegramId, onRefresh }: { wallets: any[], telegramId?: string, onRefresh?: () => void }) {
+function WalletsPage({ wallets, userId, onRefresh }: { wallets: any[], userId?: string, onRefresh?: () => void }) {
   const [showAddWalletModal, setShowAddWalletModal] = useState(false)
   const totalBalance = wallets.reduce((sum, w) => sum + w.balance, 0)
   const sortedWallets = [...wallets].sort((a, b) => b.balance - a.balance)
@@ -278,14 +270,6 @@ function WalletsPage({ wallets, telegramId, onRefresh }: { wallets: any[], teleg
             <Icons.plus className="w-4 h-4" />
             Tambah Wallet
           </button>
-          <a
-            href="https://t.me/catatduitgalih_bot"
-            target="_blank"
-            className="flex items-center gap-2 px-4 py-2 bg-accent-blue/10 text-accent-blue rounded-xl hover:bg-accent-blue/20 transition-colors"
-          >
-            <Icons.telegram className="w-4 h-4" />
-            via Telegram
-          </a>
         </div>
       </div>
       
@@ -326,22 +310,22 @@ function WalletsPage({ wallets, telegramId, onRefresh }: { wallets: any[], teleg
           <Icons.creditCard className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <p className="text-text-secondary">Belum ada dompet</p>
           <p className="text-sm text-text-secondary mt-2">
-            Gunakan perintah <code className="bg-gray-100 px-2 py-1 rounded">/addwallet [nama]</code> di Telegram
+            Klik tombol Tambah Wallet untuk membuat dompet pertama.
           </p>
         </div>
       )}
       
-      <div className="bg-accent-blue/10 rounded-xl p-4 flex items-center gap-3">
-        <Icons.messageCircle className="w-5 h-5 text-accent-blue flex-shrink-0" />
-        <p className="text-accent-blue text-sm">
-          Gunakan perintah <code className="bg-white px-2 py-1 rounded">/addwallet [nama]</code> di Telegram untuk menambah dompet baru
+      <div className="bg-primary/10 rounded-xl p-4 flex items-center gap-3">
+        <Icons.messageCircle className="w-5 h-5 text-primary flex-shrink-0" />
+        <p className="text-primary text-sm font-medium">
+          Demo mode: dompet dibuat langsung dari dashboard dan tersimpan ke Supabase.
         </p>
       </div>
       
       {/* Add Wallet Modal */}
-      {showAddWalletModal && telegramId && (
+      {showAddWalletModal && userId && (
         <AddWalletModal
-          userId={telegramId}
+          userId={userId}
           onClose={() => setShowAddWalletModal(false)}
           onSuccess={() => {
             setShowAddWalletModal(false)
@@ -496,7 +480,7 @@ function HistoryPage({ transactions }: { transactions: Transaction[] }) {
 }
 
 // Settings Page Component
-function SettingsPage({ telegramId, onLogout }: { telegramId: string | null; onLogout: () => void }) {
+function SettingsPage({ userId, onLogout }: { userId: string | null; onLogout: () => void }) {
   return (
     <div className="space-y-6 max-w-2xl">
       <div className="flex items-center gap-2">
@@ -511,33 +495,14 @@ function SettingsPage({ telegramId, onLogout }: { telegramId: string | null; onL
         </div>
         <div className="space-y-4">
           <div className="flex items-center justify-between py-3 border-b border-gray-100">
-            <span className="text-text-secondary">Telegram ID</span>
-            <span className="font-medium text-text-primary font-mono bg-gray-100 px-3 py-1 rounded">{telegramId}</span>
+            <span className="text-text-secondary">Demo User ID</span>
+            <span className="font-medium text-text-primary font-mono bg-gray-100 px-3 py-1 rounded">{userId}</span>
           </div>
           <div className="flex items-center justify-between py-3 border-b border-gray-100">
             <span className="text-text-secondary">Status</span>
             <span className="font-medium text-primary bg-primary/10 px-3 py-1 rounded-full text-sm">Free Plan</span>
           </div>
         </div>
-      </div>
-      
-      <div className="bg-card rounded-2xl p-6 shadow-card">
-        <div className="flex items-center gap-2 mb-4">
-          <Icons.telegram className="w-5 h-5 text-accent-blue" />
-          <h3 className="font-semibold text-text-primary">Integrasi</h3>
-        </div>
-        <a
-          href="https://t.me/catatduitgalih_bot"
-          target="_blank"
-          className="flex items-center gap-3 p-4 bg-accent-blue/10 rounded-xl hover:bg-accent-blue/20 transition-colors"
-        >
-          <Icons.telegram className="w-8 h-8 text-accent-blue" />
-          <div>
-            <p className="font-medium text-text-primary">Telegram Bot</p>
-            <p className="text-sm text-text-secondary">@catatduitgalih_bot</p>
-          </div>
-          <Icons.chevronRight className="w-5 h-5 ml-auto text-accent-blue" />
-        </a>
       </div>
       
       <div className="bg-card rounded-2xl p-6 shadow-card">
