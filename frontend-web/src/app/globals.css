@@ -29,14 +29,14 @@
   --color-accent-pink: #E91E63;
   
   /* Text Colors */
-  --color-text-primary: #1E293B;
-  --color-text-secondary: #475569;
-  --color-text-tertiary: #64748B;
-  
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #334155;
+  --color-text-tertiary: #475569;
+
   /* Border Colors */
-  --color-border-light: #E2E8F0;
-  --color-border-medium: #CBD5E1;
-  --color-border-dark: #94A3B8;
+  --color-border-light: #CBD5E1;
+  --color-border-medium: #94A3B8;
+  --color-border-dark: #64748B;
   
   /* Gradients */
   --gradient-primary: linear-gradient(135deg, #16A085 0%, #1ABC9C 100%);

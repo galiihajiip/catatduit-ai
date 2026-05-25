@@ -12,10 +12,13 @@ const config: Config = {
       colors: {
         // Use CSS variables for theme-aware colors
         background: {
+          DEFAULT: 'var(--color-background-primary)',
           primary: 'var(--color-background-primary)',
           secondary: 'var(--color-background-secondary)',
           surface: 'var(--color-background-surface)',
         },
+        card: 'var(--color-background-surface)',
+        surface: 'var(--color-background-surface)',
         primary: {
           DEFAULT: 'var(--color-primary)',
           light: 'var(--color-primary-light)',

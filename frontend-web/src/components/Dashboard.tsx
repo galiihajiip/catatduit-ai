@@ -123,28 +123,28 @@ export default function Dashboard({
         <div>
           <div className="flex items-center gap-2">
             <Icons.chart className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-bold text-text-primary">Monthly Report</h1>
+            <h1 className="text-2xl font-black text-slate-900">Monthly Report</h1>
           </div>
-          <p className="text-text-secondary text-sm mt-1">
+          <p className="text-slate-700 text-sm font-semibold mt-1">
             {months[selectedMonth]} {selectedYear}
           </p>
         </div>
-        
+
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-card rounded-xl p-1 shadow-sm border border-gray-100">
-            <select 
+          <div className="flex items-center gap-2 bg-white rounded-xl p-1 shadow-sm border border-slate-200">
+            <select
               value={selectedMonth}
               onChange={(e) => onMonthChange(Number(e.target.value))}
-              className="px-3 py-2 bg-transparent text-sm font-medium text-text-primary focus:outline-none cursor-pointer rounded-lg hover:bg-gray-50"
+              className="px-3 py-2 bg-transparent text-sm font-bold text-slate-900 focus:outline-none cursor-pointer rounded-lg hover:bg-slate-100"
             >
               {months.map((month, index) => (
                 <option key={index} value={index}>{month}</option>
               ))}
             </select>
-            <select 
+            <select
               value={selectedYear}
               onChange={(e) => onYearChange(Number(e.target.value))}
-              className="px-3 py-2 bg-transparent text-sm font-medium text-text-primary focus:outline-none cursor-pointer rounded-lg hover:bg-gray-50"
+              className="px-3 py-2 bg-transparent text-sm font-bold text-slate-900 focus:outline-none cursor-pointer rounded-lg hover:bg-slate-100"
             >
               {years.map((year) => (
                 <option key={year} value={year}>{year}</option>
@@ -154,36 +154,36 @@ export default function Dashboard({
         </div>
       </div>
 
-      <form onSubmit={handleQuickSubmit} className="bg-card rounded-2xl p-5 shadow-card border border-gray-100">
+      <form onSubmit={handleQuickSubmit} className="bg-white rounded-2xl p-5 shadow-card border border-slate-200">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <Icons.messageCircle className="w-5 h-5 text-primary" />
-              <h2 className="font-bold text-text-primary">Catat Cepat Pakai Bahasa Sehari-hari</h2>
+              <h2 className="font-black text-slate-900 text-base">Catat Cepat Pakai Bahasa Sehari-hari</h2>
             </div>
-            <p className="text-sm text-text-secondary mb-3">
-              Contoh: <span className="font-semibold">beli bakso 15rb cash</span>, <span className="font-semibold">gajian 5jt</span>, <span className="font-semibold">bayar bensin 50k bca</span>
+            <p className="text-sm text-slate-700 font-medium mb-3">
+              Contoh: <span className="font-bold text-slate-900">beli bakso 15rb cash</span>, <span className="font-bold text-slate-900">gajian 5jt</span>, <span className="font-bold text-slate-900">bayar bensin 50k bca</span>
             </p>
             <input
               value={quickText}
               onChange={(e) => setQuickText(e.target.value)}
               placeholder="Tulis transaksi di sini..."
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 font-medium text-gray-950 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+              className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
             />
           </div>
           <button
             type="submit"
             disabled={quickLoading}
-            className="rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-primary-light disabled:opacity-60"
+            className="rounded-xl bg-primary px-6 py-3 font-black text-white shadow-lg shadow-primary/30 transition hover:bg-primary-light disabled:opacity-60"
           >
             {quickLoading ? 'Mencatat...' : 'Catat'}
           </button>
         </div>
         {quickMessage && (
-          <div className={`mt-4 rounded-xl px-4 py-3 text-sm font-semibold ${
+          <div className={`mt-4 rounded-xl px-4 py-3 text-sm font-bold border ${
             quickMessage.type === 'success'
-              ? 'bg-primary/10 text-primary'
-              : 'bg-accent-red/10 text-accent-red'
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              : 'bg-red-50 text-red-800 border-red-200'
           }`}>
             {quickMessage.text}
           </div>

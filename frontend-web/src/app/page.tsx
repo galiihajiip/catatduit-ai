@@ -158,7 +158,7 @@ export default function Home() {
   const pageTitle = getPageTitle()
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       <Sidebar 
         activeTab={activeTab} 
         onTabChange={setActiveTab} 
@@ -176,28 +176,28 @@ export default function Home() {
             {connectivityWarning}
           </div>
         )}
-        <header className="sticky top-0 z-30 bg-card/80 backdrop-blur-lg border-b border-gray-100">
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-lg border-b-2 border-slate-200 shadow-sm">
           <div className="flex items-center justify-between px-4 lg:px-8 py-4">
             <div className="flex items-center gap-4">
               <HamburgerButton onClick={() => setSidebarOpen(true)} />
               <div className="hidden sm:flex items-center gap-2">
                 <span className="text-primary">{pageTitle.icon}</span>
-                <h1 className="text-lg font-semibold text-text-primary">{pageTitle.text}</h1>
+                <h1 className="text-lg font-black text-slate-900">{pageTitle.text}</h1>
               </div>
             </div>
-            
-            <div className="flex items-center gap-3">
-              <button 
+
+            <div className="flex items-center gap-2">
+              <button
                 onClick={() => userId && fetchData(userId)}
                 disabled={loading}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-800 hover:text-primary hover:bg-primary/10 rounded-xl transition-colors border border-slate-200"
               >
                 <Icons.refresh className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">Refresh</span>
               </button>
-              
-              <button className="p-2 hover:bg-gray-100 rounded-xl transition-colors relative">
-                <Icons.bell className="w-5 h-5 text-text-secondary" />
+
+              <button className="p-2 hover:bg-slate-100 rounded-xl transition-colors relative border border-slate-200" aria-label="Notifikasi">
+                <Icons.bell className="w-5 h-5 text-slate-800" />
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent-red rounded-full"></span>
               </button>
             </div>
@@ -261,16 +261,16 @@ function WalletsPage({ wallets, userId, onRefresh }: { wallets: any[], userId?: 
   const [showAddWalletModal, setShowAddWalletModal] = useState(false)
   const totalBalance = wallets.reduce((sum, w) => sum + w.balance, 0)
   const sortedWallets = [...wallets].sort((a, b) => b.balance - a.balance)
-  
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <Icons.wallet className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-bold text-text-primary">Dompet Saya</h1>
+            <h1 className="text-2xl font-black text-slate-900">Dompet Saya</h1>
           </div>
-          <p className="text-text-secondary">Kelola semua dompet Anda</p>
+          <p className="text-slate-700 font-semibold">Kelola semua dompet Anda</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -294,40 +294,40 @@ function WalletsPage({ wallets, userId, onRefresh }: { wallets: any[], userId?: 
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {sortedWallets.map((wallet, index) => (
-          <div 
+          <div
             key={wallet.id}
-            className="bg-card rounded-2xl p-5 shadow-card hover:shadow-lg transition-all hover:-translate-y-1"
+            className="bg-white rounded-2xl p-5 shadow-card border border-slate-200 hover:shadow-lg transition-all hover:-translate-y-1"
           >
             <div className="flex items-center justify-between mb-4">
-              <div 
+              <div
                 className="w-12 h-12 rounded-xl flex items-center justify-center"
                 style={{ backgroundColor: wallet.color_hex + '20' }}
               >
                 <Icons.creditCard className="w-6 h-6" style={{ color: wallet.color_hex }} />
               </div>
-              <span className="text-xs font-medium px-2 py-1 bg-gray-100 rounded-full text-text-secondary">
+              <span className="text-xs font-bold px-2 py-1 bg-slate-100 rounded-full text-slate-700">
                 #{index + 1}
               </span>
             </div>
-            <p className="text-text-secondary text-sm">{wallet.name}</p>
-            <p className="text-2xl font-bold text-text-primary mt-1">{formatCurrency(wallet.balance)}</p>
+            <p className="text-slate-700 text-sm font-semibold">{wallet.name}</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">{formatCurrency(wallet.balance)}</p>
           </div>
         ))}
       </div>
-      
+
       {wallets.length === 0 && (
-        <div className="bg-card rounded-2xl p-8 text-center">
-          <Icons.creditCard className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-text-secondary">Belum ada dompet</p>
-          <p className="text-sm text-text-secondary mt-2">
+        <div className="bg-white rounded-2xl p-8 text-center border border-slate-200">
+          <Icons.creditCard className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+          <p className="text-slate-900 font-bold">Belum ada dompet</p>
+          <p className="text-sm text-slate-700 font-medium mt-2">
             Klik tombol Tambah Wallet untuk membuat dompet pertama.
           </p>
         </div>
       )}
-      
-      <div className="bg-primary/10 rounded-xl p-4 flex items-center gap-3">
+
+      <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 flex items-center gap-3">
         <Icons.messageCircle className="w-5 h-5 text-primary flex-shrink-0" />
-        <p className="text-primary text-sm font-medium">
+        <p className="text-primary text-sm font-bold">
           Demo mode: dompet dibuat langsung dari dashboard dan tersimpan ke Supabase.
         </p>
       </div>
@@ -353,7 +353,7 @@ function AnalyticsPage({ analytics }: { analytics: Analytics }) {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Icons.pieChart className="w-6 h-6 text-primary" />
-        <h1 className="text-2xl font-bold text-text-primary">Analisis Keuangan</h1>
+        <h1 className="text-2xl font-black text-slate-900">Analisis Keuangan</h1>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -426,18 +426,18 @@ function HistoryPage({ transactions }: { transactions: Transaction[] }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Icons.history className="w-6 h-6 text-primary" />
-          <h1 className="text-2xl font-bold text-text-primary">Riwayat Transaksi</h1>
+          <h1 className="text-2xl font-black text-slate-900">Riwayat Transaksi</h1>
         </div>
-        
-        <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+
+        <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1 border border-slate-200">
           {(['all', 'income', 'expense'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                filter === f 
-                  ? 'bg-white text-primary shadow-sm' 
-                  : 'text-text-secondary hover:text-text-primary'
+              className={`px-3 py-1.5 text-sm font-bold rounded-md transition-colors ${
+                filter === f
+                  ? 'bg-white text-primary shadow-sm'
+                  : 'text-slate-700 hover:text-slate-900'
               }`}
             >
               {f === 'all' ? 'Semua' : f === 'income' ? 'Pemasukan' : 'Pengeluaran'}
@@ -446,16 +446,16 @@ function HistoryPage({ transactions }: { transactions: Transaction[] }) {
         </div>
       </div>
       
-      <div className="bg-card rounded-2xl shadow-card divide-y divide-gray-50">
+      <div className="bg-white rounded-2xl shadow-card border border-slate-200 divide-y divide-slate-100">
         {filteredTx.length === 0 ? (
           <div className="p-8 text-center">
-            <Icons.receipt className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-text-secondary">Belum ada transaksi</p>
+            <Icons.receipt className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-900 font-bold">Belum ada transaksi</p>
           </div>
         ) : (
           filteredTx.map((tx) => (
-            <div key={tx.id} className="p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
-              <div 
+            <div key={tx.id} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+              <div
                 className="w-12 h-12 rounded-xl flex items-center justify-center"
                 style={{ backgroundColor: (tx.category?.color_hex || '#7F8C8D') + '20' }}
               >
@@ -466,16 +466,16 @@ function HistoryPage({ transactions }: { transactions: Transaction[] }) {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-text-primary truncate">{tx.description}</p>
-                <p className="text-sm text-text-secondary">{tx.category?.name || 'Lainnya'}</p>
+                <p className="font-bold text-slate-900 truncate">{tx.description}</p>
+                <p className="text-sm text-slate-700 font-semibold">{tx.category?.name || 'Lainnya'}</p>
               </div>
               <div className="text-right">
-                <p className={`font-semibold ${tx.type === 'income' ? 'text-primary' : 'text-accent-red'}`}>
+                <p className={`font-black ${tx.type === 'income' ? 'text-primary' : 'text-accent-red'}`}>
                   {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
                 </p>
-                <p className="text-xs text-text-secondary">
-                  {new Date(tx.created_at).toLocaleDateString('id-ID', { 
-                    day: 'numeric', 
+                <p className="text-xs text-slate-600 font-semibold">
+                  {new Date(tx.created_at).toLocaleDateString('id-ID', {
+                    day: 'numeric',
                     month: 'short',
                     year: 'numeric'
                   })}
@@ -495,34 +495,34 @@ function SettingsPage({ userId, onLogout }: { userId: string | null; onLogout: (
     <div className="space-y-6 max-w-2xl">
       <div className="flex items-center gap-2">
         <Icons.settings className="w-6 h-6 text-primary" />
-        <h1 className="text-2xl font-bold text-text-primary">Pengaturan</h1>
+        <h1 className="text-2xl font-black text-slate-900">Pengaturan</h1>
       </div>
-      
-      <div className="bg-card rounded-2xl p-6 shadow-card">
+
+      <div className="bg-white rounded-2xl p-6 shadow-card border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
           <Icons.user className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold text-text-primary">Akun</h3>
+          <h3 className="font-black text-slate-900">Akun</h3>
         </div>
         <div className="space-y-4">
-          <div className="flex items-center justify-between py-3 border-b border-gray-100">
-            <span className="text-text-secondary">Demo User ID</span>
-            <span className="font-medium text-text-primary font-mono bg-gray-100 px-3 py-1 rounded">{userId}</span>
+          <div className="flex items-center justify-between py-3 border-b border-slate-200">
+            <span className="text-slate-700 font-semibold">Demo User ID</span>
+            <span className="font-bold text-slate-900 font-mono bg-slate-100 px-3 py-1 rounded border border-slate-200">{userId}</span>
           </div>
-          <div className="flex items-center justify-between py-3 border-b border-gray-100">
-            <span className="text-text-secondary">Status</span>
-            <span className="font-medium text-primary bg-primary/10 px-3 py-1 rounded-full text-sm">Free Plan</span>
+          <div className="flex items-center justify-between py-3 border-b border-slate-200">
+            <span className="text-slate-700 font-semibold">Status</span>
+            <span className="font-bold text-primary bg-primary/10 border border-primary/30 px-3 py-1 rounded-full text-sm">Free Plan</span>
           </div>
         </div>
       </div>
-      
-      <div className="bg-card rounded-2xl p-6 shadow-card">
+
+      <div className="bg-white rounded-2xl p-6 shadow-card border border-red-200">
         <div className="flex items-center gap-2 mb-4">
-          <Icons.close className="w-5 h-5 text-accent-red" />
-          <h3 className="font-semibold text-text-primary">Zona Bahaya</h3>
+          <Icons.alertCircle className="w-5 h-5 text-accent-red" />
+          <h3 className="font-black text-slate-900">Zona Bahaya</h3>
         </div>
         <button
           onClick={onLogout}
-          className="w-full py-3 bg-accent-red/10 text-accent-red font-medium rounded-xl hover:bg-accent-red/20 transition-colors flex items-center justify-center gap-2"
+          className="w-full py-3 bg-accent-red/10 border border-accent-red/30 text-accent-red font-bold rounded-xl hover:bg-accent-red/20 transition-colors flex items-center justify-center gap-2"
         >
           <Icons.logout className="w-4 h-4" />
           Keluar dari Akun

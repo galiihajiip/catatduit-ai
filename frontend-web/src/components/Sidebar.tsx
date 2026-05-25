@@ -52,57 +52,61 @@ export default function Sidebar({
       )}
 
       {/* Sidebar */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-50 w-72 bg-card border-r border-gray-100
-        transform transition-transform duration-300 ease-in-out
-        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0
-      `}>
+      <aside
+        className={`
+          fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-white border-r-2 border-slate-200 shadow-xl shadow-slate-900/5
+          transform transition-transform duration-300 ease-in-out
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0
+        `}
+      >
         {/* Logo & Close Button */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 py-5 border-b-2 border-slate-200">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-light rounded-xl flex items-center justify-center shadow-lg shadow-primary/30">
-              <Icons.dollarSign className="w-5 h-5 text-white" />
+            <div className="w-11 h-11 bg-gradient-to-br from-primary to-primary-light rounded-xl flex items-center justify-center shadow-lg shadow-primary/30">
+              <Icons.dollarSign className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="font-bold text-text-primary text-lg">
+              <h1 className="font-black text-slate-900 text-lg tracking-tight">
                 <span className="text-primary">Catat</span>
                 <span className="text-accent-orange">.in</span>
-                <span className="text-text-primary"> Duit</span>
+                <span className="text-slate-900"> Duit</span>
               </h1>
-              <p className="text-xs text-text-secondary">AI Finance Manager</p>
+              <p className="text-xs font-semibold text-slate-600">Pembukuan UMKM Berbasis AI Lokal</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={onToggle}
-            className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
+            className="lg:hidden p-2 rounded-lg text-slate-700 hover:bg-slate-100"
           >
-            <Icons.close className="w-5 h-5 text-text-secondary" />
+            <Icons.close className="w-5 h-5" />
           </button>
         </div>
 
         {/* User Profile */}
         {userId && (
-          <div className="px-4 py-4 border-b border-gray-100">
-            <button 
+          <div className="px-4 py-4 border-b-2 border-slate-200">
+            <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-200"
             >
-              <div className="w-10 h-10 bg-gradient-to-br from-accent-blue to-blue-600 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-light rounded-full flex items-center justify-center shadow-md shadow-primary/30">
                 <Icons.user className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 text-left">
-                <p className="font-medium text-text-primary text-sm">{userName || 'User'}</p>
-                <p className="text-xs text-text-secondary">Demo ID: {userId}</p>
+                <p className="font-bold text-slate-900 text-sm">{userName || 'User'}</p>
+                <p className="text-xs font-semibold text-slate-600">Demo ID: {userId}</p>
               </div>
-              <Icons.chevronDown className={`w-4 h-4 text-text-secondary transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
+              <Icons.chevronDown
+                className={`w-4 h-4 text-slate-700 transition-transform ${showUserMenu ? 'rotate-180' : ''}`}
+              />
             </button>
-            
+
             {showUserMenu && (
-              <div className="mt-2 p-2 bg-gray-50 rounded-xl">
-                <button 
+              <div className="mt-2 p-2 bg-slate-50 rounded-xl border border-slate-200">
+                <button
                   onClick={onLogout}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-accent-red hover:bg-white rounded-lg transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm font-bold text-accent-red hover:bg-white rounded-lg transition-colors"
                 >
                   <Icons.logout className="w-4 h-4" />
                   Keluar
@@ -111,9 +115,12 @@ export default function Sidebar({
             )}
           </div>
         )}
-        
+
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+          <p className="px-4 pb-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+            Menu Utama
+          </p>
           {menuItems.map((item) => {
             const Icon = item.icon
             const isActive = activeTab === item.id
@@ -121,48 +128,50 @@ export default function Sidebar({
               <button
                 key={item.id}
                 onClick={() => handleTabChange(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  isActive 
-                    ? 'bg-primary text-white shadow-lg shadow-primary/30' 
-                    : 'text-text-secondary hover:bg-gray-50 hover:text-text-primary'
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${
+                  isActive
+                    ? 'bg-primary text-white shadow-lg shadow-primary/30'
+                    : 'text-slate-800 hover:bg-slate-100 hover:text-slate-900'
                 }`}
               >
                 <Icon className="w-5 h-5" />
-                <span className="font-medium">{item.label}</span>
+                <span>{item.label}</span>
                 {item.id === 'analytics' && isPro && (
-                  <span className="ml-auto px-2 py-0.5 bg-yellow-400/20 text-yellow-600 text-xs rounded-full">PRO</span>
+                  <span className="ml-auto px-2 py-0.5 bg-yellow-400/20 text-yellow-700 text-xs font-black rounded-full">
+                    PRO
+                  </span>
                 )}
               </button>
             )
           })}
         </nav>
-        
+
         {/* Social Links */}
-        <div className="px-4 pb-2 space-y-2">
+        <div className="px-4 pb-2">
           <a
             href="https://instagram.com/catatin.duit"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-pink-500/10 to-purple-500/10 text-pink-600 rounded-xl hover:from-pink-500/20 hover:to-purple-500/20 transition-all"
+            className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-pink-500/10 to-purple-500/10 text-pink-700 rounded-xl hover:from-pink-500/20 hover:to-purple-500/20 transition-all border border-pink-200"
           >
             <Icons.instagram className="w-5 h-5" />
             <div>
-              <p className="font-medium text-sm">Instagram</p>
-              <p className="text-xs opacity-80">@catatin.duit</p>
+              <p className="font-bold text-sm">Instagram</p>
+              <p className="text-xs font-semibold opacity-80">@catatin.duit</p>
             </div>
           </a>
         </div>
-        
+
         {/* Upgrade CTA */}
         {!isPro && (
           <div className="px-4 pb-6">
-            <div className="p-4 bg-gradient-to-br from-yellow-400/10 to-orange-400/10 rounded-xl border border-yellow-400/20">
+            <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200">
               <div className="flex items-center gap-2 mb-2">
-                <Icons.crown className="w-5 h-5 text-yellow-500" />
-                <span className="font-semibold text-text-primary">Upgrade Pro</span>
+                <Icons.crown className="w-5 h-5 text-amber-600" />
+                <span className="font-black text-slate-900">Upgrade Pro</span>
               </div>
-              <p className="text-xs text-text-secondary mb-3">Fitur lengkap & tanpa batas</p>
-              <button className="w-full py-2.5 bg-gradient-to-r from-yellow-400 to-orange-400 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity shadow-lg shadow-orange-400/30">
+              <p className="text-xs font-semibold text-slate-700 mb-3">Fitur lengkap & tanpa batas</p>
+              <button className="w-full py-2.5 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-sm font-black rounded-lg hover:opacity-95 transition-opacity shadow-lg shadow-orange-500/30">
                 Upgrade Sekarang
               </button>
             </div>
@@ -176,11 +185,12 @@ export default function Sidebar({
 // Hamburger Button for Mobile
 export function HamburgerButton({ onClick }: { onClick: () => void }) {
   return (
-    <button 
+    <button
       onClick={onClick}
-      className="lg:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
+      className="lg:hidden p-2 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200"
+      aria-label="Buka menu navigasi"
     >
-      <Icons.menu className="w-6 h-6 text-text-primary" />
+      <Icons.menu className="w-6 h-6 text-slate-900" />
     </button>
   )
 }
