@@ -58,6 +58,10 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
   const [capturedPhoto, setCapturedPhoto] = useState<Blob | null>(null)
   const [capturedPreviewUrl, setCapturedPreviewUrl] = useState<string | null>(null)
   const [warmupDone, setWarmupDone] = useState(false)
+  const [previewResult, setPreviewResult] = useState<ScanResult | null>(null)
+  const [editMerchant, setEditMerchant] = useState('')
+  const [editTotal, setEditTotal] = useState('')
+  const [isCommitting, setIsCommitting] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -170,17 +174,24 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
     await processImage(file)
   }
 
-  const processImage = async (imageFile: Blob) => {
+  const processImage = async (imageFile: Blob, options?: { commit?: boolean }) => {
     if (imageFile.size > MAX_CLIENT_IMAGE_SIZE) {
       setError('Foto terlalu besar. Coba ambil foto lebih dekat atau gunakan upload gambar yang lebih kecil.')
       return
     }
 
-    setIsProcessing(true)
-    setProcessingMessage('Membaca teks struk dengan OCR lokal...')
-    setError(null)
-    setDemoWarning(null)
-    setScanResult(null)
+    const isCommit = !!options?.commit
+    if (isCommit) {
+      setIsCommitting(true)
+      setProcessingMessage('Menyimpan transaksi ke catatan...')
+    } else {
+      setIsProcessing(true)
+      setProcessingMessage('Membaca teks struk dengan OCR...')
+      setError(null)
+      setDemoWarning(null)
+      setScanResult(null)
+      setPreviewResult(null)
+    }
 
     const controller = new AbortController()
     const timeout = window.setTimeout(() => controller.abort(), OCR_TIMEOUT_MS)
@@ -189,6 +200,14 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
       const formData = new FormData()
       formData.append('file', imageFile, 'receipt.jpg')
       formData.append('user_id', userId)
+      if (isCommit) {
+        formData.append('commit', 'true')
+        if (editMerchant.trim()) formData.append('override_merchant', editMerchant.trim())
+        const totalNumeric = Number.parseInt(editTotal.replace(/[^\d]/g, ''), 10)
+        if (Number.isFinite(totalNumeric) && totalNumeric > 0) {
+          formData.append('override_total', String(totalNumeric))
+        }
+      }
 
       const response = await fetch('/api/ocr/scan-receipt', {
         method: 'POST',
@@ -200,6 +219,8 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
       const text = await response.text()
       let data: {
         success?: boolean
+        committed?: boolean
+        preview?: boolean
         demo_mode?: boolean
         message?: string
         receipt_data?: ScanResult
@@ -214,10 +235,19 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
       }
 
       if (response.ok && data.success && data.receipt_data) {
-        setScanResult(data.receipt_data)
-        setDemoWarning(data.demo_mode ? (data.message ?? null) : null)
-        stopCamera()
-        if (onSuccess && !data.demo_mode) onSuccess()
+        if (data.committed) {
+          setScanResult(data.receipt_data)
+          setPreviewResult(null)
+          setDemoWarning(data.demo_mode ? (data.message ?? null) : null)
+          stopCamera()
+          clearCapturedPhoto()
+          if (onSuccess && !data.demo_mode) onSuccess()
+        } else {
+          setPreviewResult(data.receipt_data)
+          setEditMerchant(data.receipt_data.merchant ?? '')
+          setEditTotal(String(data.receipt_data.total ?? ''))
+          stopCamera()
+        }
       } else {
         setError(data.detail || data.error || 'Gagal memproses struk')
       }
@@ -234,12 +264,26 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
     } finally {
       window.clearTimeout(timeout)
       setIsProcessing(false)
+      setIsCommitting(false)
+    }
+  }
+
+  const submitCommittedReceipt = async () => {
+    if (!capturedPhoto && fileInputRef.current?.files?.[0]) {
+      await processImage(fileInputRef.current.files[0], { commit: true })
+      return
+    }
+    if (capturedPhoto) {
+      await processImage(capturedPhoto, { commit: true })
+    } else {
+      setError('Foto struk hilang. Ambil ulang foto lalu coba lagi.')
     }
   }
 
   const handleOpen = () => {
     setIsOpen(true)
     setScanResult(null)
+    setPreviewResult(null)
     setError(null)
     setDemoWarning(null)
     clearCapturedPhoto()
@@ -249,6 +293,7 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
     setIsOpen(false)
     stopCamera()
     setScanResult(null)
+    setPreviewResult(null)
     setError(null)
     setDemoWarning(null)
     clearCapturedPhoto()
@@ -300,7 +345,7 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
         </div>
 
         {/* Mode Selector */}
-        {!scanResult && (
+        {!scanResult && !previewResult && (
           <div className="p-4 border-b border-gray-100">
             <div className="flex gap-2 bg-gray-100 rounded-lg p-1">
               <button
@@ -331,8 +376,76 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
 
         {/* Content */}
         <div className="p-6">
+          {/* Edit OCR result before saving */}
+          {previewResult && !scanResult && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
+                OCR sudah membaca struk. Cek dan koreksi angka jika perlu, lalu simpan.
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-bold text-gray-900">Nama Toko / Merchant</label>
+                <input
+                  type="text"
+                  value={editMerchant}
+                  onChange={(event) => setEditMerchant(event.target.value)}
+                  placeholder="Misal: Alfamart"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-950 outline-none focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-bold text-gray-900">Total Belanja (Rp)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={editTotal}
+                  onChange={(event) => setEditTotal(event.target.value)}
+                  placeholder="Misal: 125000"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base font-bold text-gray-950 outline-none focus:border-primary"
+                />
+                <p className="mt-1 text-xs font-medium text-gray-600">
+                  OCR membaca: {formatCurrency(previewResult.total ?? 0)} — koreksi angka jika OCR salah baca.
+                </p>
+              </div>
+
+              {capturedPreviewUrl && (
+                <details className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                  <summary className="cursor-pointer text-sm font-bold text-gray-800">
+                    Lihat foto struk
+                  </summary>
+                  <img
+                    src={capturedPreviewUrl}
+                    alt="Foto struk"
+                    className="mt-3 max-h-[40vh] w-full rounded-lg object-contain"
+                  />
+                </details>
+              )}
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  onClick={() => {
+                    setPreviewResult(null)
+                    setError(null)
+                  }}
+                  disabled={isCommitting}
+                  className="w-full rounded-xl border border-gray-300 bg-white py-3 font-medium text-gray-800 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={submitCommittedReceipt}
+                  disabled={isCommitting || !editTotal.trim()}
+                  className="w-full rounded-xl bg-primary py-3 font-bold text-white transition-colors hover:bg-primary-light disabled:opacity-50"
+                >
+                  {isCommitting ? 'Menyimpan...' : 'Simpan ke Catatan'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Upload Mode */}
-          {mode === 'upload' && !scanResult && (
+          {mode === 'upload' && !scanResult && !previewResult && (
             <div>
               <input
                 ref={fileInputRef}
@@ -358,7 +471,7 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
           )}
 
           {/* Camera Mode */}
-          {mode === 'camera' && !scanResult && (
+          {mode === 'camera' && !scanResult && !previewResult && (
             <div className="space-y-4">
               {capturedPreviewUrl ? (
                 <>

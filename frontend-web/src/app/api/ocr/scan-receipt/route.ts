@@ -153,6 +153,16 @@ export async function POST(request: NextRequest) {
       return jsonError('Invalid image', imageError, 400)
     }
 
+    const commitFlag = String(formData.get('commit') ?? '').toLowerCase() === 'true'
+    const overrideTotalRaw = formData.get('override_total')
+    const overrideMerchantRaw = formData.get('override_merchant')
+    const overrideTotal =
+      typeof overrideTotalRaw === 'string' && overrideTotalRaw.trim().length > 0
+        ? Math.round(Number.parseFloat(overrideTotalRaw))
+        : null
+    const overrideMerchant =
+      typeof overrideMerchantRaw === 'string' ? overrideMerchantRaw.trim() : ''
+
     const base64 = await fileToBase64(file)
     let receipt: ProcessedReceipt
     try {
@@ -168,27 +178,52 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const effectiveMerchant = overrideMerchant || receipt.merchant
+    const effectiveTotal =
+      overrideTotal && Number.isFinite(overrideTotal) && overrideTotal > 0
+        ? overrideTotal
+        : receipt.total
+
     const parsed = parseTransaction(
       [
-        receipt.merchant,
+        effectiveMerchant,
         receipt.rawText,
         receipt.items.map((item) => item.name).join(' '),
       ]
         .filter(Boolean)
         .join('\n'),
-      receipt.total
+      effectiveTotal
     )
 
-    if (receipt.total <= 0) {
-      return NextResponse.json({
-        success: true,
-        demo_mode: true,
-        message:
-          'Foto berhasil dibaca OCR lokal, tetapi total belanja belum terdeteksi. Coba foto lebih dekat/terang, atau masukkan nominal lewat Catat Cepat.',
-        ocr_engine: receipt.ocrEngine,
-        receipt_data: buildReceiptPayload(receipt),
-        parsed_transaction: parsed,
-      })
+    const previewPayload = {
+      success: true,
+      preview: true,
+      ocr_engine: receipt.ocrEngine,
+      receipt_data: {
+        ...buildReceiptPayload(receipt),
+        merchant: effectiveMerchant,
+        total: effectiveTotal,
+      },
+      parsed_transaction: parsed,
+    }
+
+    if (!commitFlag) {
+      if (effectiveTotal <= 0) {
+        return NextResponse.json({
+          ...previewPayload,
+          message:
+            'Foto berhasil dibaca OCR. Cek dan koreksi total/merchant sebelum disimpan.',
+        })
+      }
+      return NextResponse.json(previewPayload)
+    }
+
+    if (effectiveTotal <= 0) {
+      return jsonError(
+        'Total belum terisi',
+        'Isi total belanja terlebih dahulu sebelum disimpan ke catatan.',
+        400
+      )
     }
 
     if (isSupabasePlaceholder()) {
@@ -197,7 +232,7 @@ export async function POST(request: NextRequest) {
         demo_mode: true,
         message: getSupabaseConfigError(),
         ocr_engine: receipt.ocrEngine,
-        receipt_data: buildReceiptPayload(receipt),
+        receipt_data: { ...buildReceiptPayload(receipt), merchant: effectiveMerchant, total: effectiveTotal },
         parsed_transaction: parsed,
       })
     }
@@ -207,9 +242,7 @@ export async function POST(request: NextRequest) {
       const wallet = await getOrCreateWallet(user.id)
       const category = await findCategory(parsed.category)
 
-      const description = `Belanja di ${receipt.merchant || 'Toko'}${
-        receipt.items.length > 0 ? ` - ${receipt.items.length} item` : ''
-      }`
+      const description = `Belanja di ${effectiveMerchant || 'Toko'}`
 
       const { data: transaction, error: transactionError } = await supabase
         .from('transactions')
@@ -218,7 +251,7 @@ export async function POST(request: NextRequest) {
           wallet_id: wallet.id,
           category_id: category?.id ?? null,
           type: parsed.intent === 'income' ? 'income' : 'expense',
-          amount: receipt.total,
+          amount: effectiveTotal,
           description,
           raw_input: receipt.rawText,
           ai_confidence: Math.max(receipt.confidence, parsed.confidence),
@@ -231,8 +264,8 @@ export async function POST(request: NextRequest) {
 
       const newBalance =
         parsed.intent === 'income'
-          ? Number(wallet.balance) + receipt.total
-          : Number(wallet.balance) - receipt.total
+          ? Number(wallet.balance) + effectiveTotal
+          : Number(wallet.balance) - effectiveTotal
 
       const { error: balanceError } = await supabase
         .from('wallets')
@@ -243,9 +276,10 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: 'Receipt processed successfully',
+        committed: true,
+        message: 'Transaksi disimpan dari struk',
         ocr_engine: receipt.ocrEngine,
-        receipt_data: buildReceiptPayload(receipt),
+        receipt_data: { ...buildReceiptPayload(receipt), merchant: effectiveMerchant, total: effectiveTotal },
         parsed_transaction: parsed,
         transaction: {
           id: transaction.id,
