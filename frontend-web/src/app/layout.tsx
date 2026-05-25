@@ -30,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="id" suppressHydrationWarning>
+    <html lang="id" className="light" suppressHydrationWarning>
       <head>
         <meta name="theme-color" content="#0F766E" />
         <meta name="mobile-web-app-capable" content="yes" />

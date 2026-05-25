@@ -527,10 +527,11 @@ export default function Dashboard({
                     data={analytics.categoryBreakdown || []}
                     cx="50%"
                     cy="50%"
-                    outerRadius={90}
+                    outerRadius={80}
                     dataKey="amount"
-                    label={({ category, percentage }: { category: string; percentage: number }) => `${category}: ${percentage.toFixed(0)}%`}
-                    labelLine={false}
+                    label={({ category, percentage }: { category: string; percentage: number }) => `${category} ${percentage.toFixed(0)}%`}
+                    labelLine={{ stroke: '#475569' }}
+                    style={{ fontSize: 12, fontWeight: 700, fill: '#0F172A' }}
                   >
                     {(analytics.categoryBreakdown || []).map((entry: any, index: number) => (
                       <Cell key={`cell-dist-${index}`} fill={entry.colorHex} stroke="white" strokeWidth={2} />

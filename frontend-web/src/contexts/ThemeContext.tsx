@@ -17,22 +17,14 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-const THEME_STORAGE_KEY = 'catatduit-theme'
+const THEME_STORAGE_KEY = 'catatduit-theme-v2'
 
 /**
- * Detects system theme preference
- * @returns 'dark' if system prefers dark mode, 'light' otherwise
+ * Default theme. We intentionally lock to light because most UI components
+ * use light-mode color tokens; users can still toggle to dark via UI.
  */
 function getSystemTheme(): Theme {
-  if (typeof window === 'undefined') return 'light'
-  
-  try {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    return prefersDark ? 'dark' : 'light'
-  } catch (error) {
-    console.warn('Failed to detect system theme preference:', error)
-    return 'light'
-  }
+  return 'light'
 }
 
 /**
@@ -114,32 +106,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     applyTheme(theme)
   }, [theme])
 
-  // Listen for system theme changes
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    
-    const handleChange = (e: MediaQueryListEvent) => {
-      // Only update if user hasn't set a preference
-      const stored = getStoredTheme()
-      if (!stored) {
-        const newTheme = e.matches ? 'dark' : 'light'
-        setThemeState(newTheme)
-      }
-    }
-
-    // Modern browsers
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange)
-      return () => mediaQuery.removeEventListener('change', handleChange)
-    }
-    // Legacy browsers
-    else if (mediaQuery.addListener) {
-      mediaQuery.addListener(handleChange)
-      return () => mediaQuery.removeListener(handleChange)
-    }
-  }, [])
+  // System theme changes are intentionally ignored — the app defaults to light
+  // unless the user explicitly toggles dark mode via the theme toggle.
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme)

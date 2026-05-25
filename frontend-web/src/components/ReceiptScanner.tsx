@@ -469,13 +469,13 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isProcessing}
-                className="w-full border-2 border-dashed border-gray-300 rounded-xl p-12 hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
+                className="w-full border-2 border-dashed border-slate-400 rounded-xl p-12 hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
               >
-                <Icons.upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-text-primary font-medium mb-1">
+                <Icons.upload className="w-12 h-12 text-primary mx-auto mb-4" />
+                <p className="text-slate-900 font-black mb-1 text-base">
                   {isProcessing ? 'Memproses...' : 'Klik untuk upload foto struk'}
                 </p>
-                <p className="text-sm text-text-secondary">
+                <p className="text-sm font-semibold text-slate-700">
                   Atau drag & drop file gambar di sini
                 </p>
               </button>
