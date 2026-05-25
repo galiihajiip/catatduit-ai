@@ -336,18 +336,50 @@ export function parseReceiptText(text: string): ReceiptData {
   }
 }
 
+type TesseractWorker = {
+  recognize: (image: Buffer) => Promise<{ data: { text: string } }>
+  terminate: () => Promise<void>
+}
+
+let workerPromise: Promise<TesseractWorker> | null = null
+
+async function getTesseractWorker(): Promise<TesseractWorker> {
+  if (!workerPromise) {
+    workerPromise = (async () => {
+      const tesseract = await import('tesseract.js')
+      const createWorker = (tesseract as unknown as {
+        createWorker: (lang: string, oem?: number, options?: unknown) => Promise<TesseractWorker>
+      }).createWorker
+      console.log('Tesseract worker: initializing (one-time warm-up)')
+      const worker = await createWorker('eng', 1, {
+        logger: (info: { status?: string; progress?: number }) => {
+          if (info?.status && info.status !== 'recognizing text') {
+            console.log(`Tesseract worker: ${info.status}`)
+          }
+        },
+      })
+      console.log('Tesseract worker: ready')
+      return worker
+    })().catch((error) => {
+      workerPromise = null
+      throw error
+    })
+  }
+  return workerPromise
+}
+
+export async function warmupTesseract(): Promise<void> {
+  await getTesseractWorker()
+}
+
 export async function processReceiptWithTesseract(imageBase64: string): Promise<ReceiptData> {
-  const { recognize } = await import('tesseract.js')
   const buffer = Buffer.from(imageBase64, 'base64')
 
   try {
-    const result = await recognize(buffer, 'eng', {
-      logger: (info) => {
-        if (info.status === 'recognizing text') {
-          console.log(`Tesseract OCR progress: ${Math.round((info.progress ?? 0) * 100)}%`)
-        }
-      },
-    })
+    const worker = await getTesseractWorker()
+    const start = Date.now()
+    const result = await worker.recognize(buffer)
+    console.log(`Tesseract OCR done in ${Date.now() - start}ms`)
 
     const text = result.data.text?.trim()
     if (!text) {
