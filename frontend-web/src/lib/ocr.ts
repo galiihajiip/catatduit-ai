@@ -162,6 +162,13 @@ function extractDate(text: string): string | null {
   return null
 }
 
+function looksLikeIdNumber(raw: string): boolean {
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length >= 9) return true
+  if (/^\d{6,}$/.test(raw)) return true
+  return false
+}
+
 function extractTotal(text: string, lines: string[]): number {
   let total = 0
   let bestScore = 0
@@ -170,8 +177,10 @@ function extractTotal(text: string, lines: string[]): number {
     const match = text.match(pattern)
     if (!match) continue
 
+    if (looksLikeIdNumber(match[1])) continue
+
     const amount = parseAmount(match[1])
-    if (amount < 100 || amount > 100_000_000) continue
+    if (amount < 1_000 || amount > 50_000_000) continue
 
     const index = text.indexOf(match[0])
     const positionBoost = index > text.length * 0.6 ? 20 : 0
@@ -185,13 +194,24 @@ function extractTotal(text: string, lines: string[]): number {
 
   if (total > 0) return total
 
-  const bottomHalf = lines.slice(Math.floor(lines.length / 2)).join('\n')
-  const amounts = (bottomHalf.match(/(?:rp\.?\s*)?[\d.,]{4,}/gi) ?? [])
-    .map(parseAmount)
-    .filter((amount) => amount >= 100 && amount <= 100_000_000)
-    .sort((a, b) => b - a)
+  const bottomHalf = lines.slice(Math.floor(lines.length / 2))
+  const candidateAmounts: number[] = []
 
-  return amounts[0] ?? 0
+  for (const line of bottomHalf) {
+    if (/(no|nomor|invoice|struk|trans|kode|barcode|member|id|idpel|tlp|telp|hp)\b/i.test(line)) continue
+
+    const matches = line.match(/(?:rp\.?\s*)?(\d[\d.,]{2,})/gi) ?? []
+    for (const raw of matches) {
+      const cleaned = raw.replace(/[^\d.,]/g, '')
+      if (looksLikeIdNumber(cleaned)) continue
+      const amount = parseAmount(cleaned)
+      if (amount < 1_000 || amount > 50_000_000) continue
+      candidateAmounts.push(amount)
+    }
+  }
+
+  candidateAmounts.sort((a, b) => b - a)
+  return candidateAmounts[0] ?? 0
 }
 
 function isUtilityReceipt(text: string): boolean {

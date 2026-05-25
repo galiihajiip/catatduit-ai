@@ -20,6 +20,7 @@ interface ScanResult {
     category: string
   }>
   confidence: number
+  raw_text?: string
 }
 
 const MAX_CLIENT_IMAGE_SIZE = 8 * 1024 * 1024
@@ -419,6 +420,17 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
                     alt="Foto struk"
                     className="mt-3 max-h-[40vh] w-full rounded-lg object-contain"
                   />
+                </details>
+              )}
+
+              {previewResult.raw_text && (
+                <details className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                  <summary className="cursor-pointer text-sm font-bold text-gray-800">
+                    Lihat teks OCR mentah ({(previewResult.confidence * 100).toFixed(0)}% confidence)
+                  </summary>
+                  <pre className="mt-3 max-h-60 overflow-y-auto whitespace-pre-wrap rounded-lg bg-white p-3 text-xs font-medium text-gray-700">
+                    {previewResult.raw_text}
+                  </pre>
                 </details>
               )}
 
