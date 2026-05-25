@@ -134,7 +134,12 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
         setError(data.detail || data.error || 'Gagal memproses struk')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat memproses gambar')
+      const message = err instanceof Error ? err.message : 'Terjadi kesalahan saat memproses gambar'
+      setError(
+        /failed to fetch/i.test(message)
+          ? 'Tidak bisa menghubungi server OCR lokal. Pastikan npm run dev masih berjalan, lalu coba lagi.'
+          : message
+      )
       console.error('Process error:', err)
     } finally {
       setIsProcessing(false)

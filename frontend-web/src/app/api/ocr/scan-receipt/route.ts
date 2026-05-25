@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fileToBase64, processReceipt, type ProcessedReceipt } from '@/lib/ocr'
 import { parseTransaction } from '@/lib/nlp'
-import { supabase } from '@/lib/supabase'
 import { getSupabaseConfigError, isSupabaseFetchError, isSupabasePlaceholder } from '@/lib/supabase-config'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 
 export const runtime = 'nodejs'
+
+const supabase = createSupabaseServerClient()
 
 interface UserRow {
   id: string
@@ -151,12 +153,20 @@ export async function POST(request: NextRequest) {
       return jsonError('Invalid image', imageError, 400)
     }
 
-    if (isSupabasePlaceholder()) {
-      return jsonError('Database belum dikonfigurasi', getSupabaseConfigError(), 503)
-    }
-
     const base64 = await fileToBase64(file)
-    const receipt = await processReceipt(base64)
+    let receipt: ProcessedReceipt
+    try {
+      receipt = await processReceipt(base64)
+    } catch (ocrError) {
+      const detail = ocrError instanceof Error ? ocrError.message : 'OCR lokal gagal memproses gambar'
+      return jsonError(
+        'Gagal menjalankan OCR lokal',
+        /fetch failed/i.test(detail)
+          ? 'Tesseract lokal gagal memuat engine atau data bahasa. Pastikan koneksi internet tersedia untuk proses pertama, lalu restart npm run dev dan coba lagi.'
+          : detail,
+        503
+      )
+    }
 
     if (receipt.total <= 0) {
       return jsonError('Gagal membaca total struk', 'Total harga tidak ditemukan dari hasil OCR', 422)
@@ -173,66 +183,92 @@ export async function POST(request: NextRequest) {
       receipt.total
     )
 
-    const user = await getOrCreateUser(userId.trim())
-    const wallet = await getOrCreateWallet(user.id)
-    const category = await findCategory(parsed.category)
-
-    const description = `Belanja di ${receipt.merchant || 'Toko'}${
-      receipt.items.length > 0 ? ` - ${receipt.items.length} item` : ''
-    }`
-
-    const { data: transaction, error: transactionError } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: user.id,
-        wallet_id: wallet.id,
-        category_id: category?.id ?? null,
-        type: parsed.intent === 'income' ? 'income' : 'expense',
-        amount: receipt.total,
-        description,
-        raw_input: receipt.rawText,
-        ai_confidence: Math.max(receipt.confidence, parsed.confidence),
+    if (isSupabasePlaceholder()) {
+      return NextResponse.json({
+        success: true,
+        demo_mode: true,
+        message: getSupabaseConfigError(),
+        ocr_engine: receipt.ocrEngine,
+        receipt_data: buildReceiptPayload(receipt),
+        parsed_transaction: parsed,
       })
-      .select('id, amount, description')
-      .single()
+    }
 
-    if (transactionError) throw transactionError
-    if (!transaction) throw new Error('Transaksi gagal dibuat')
+    try {
+      const user = await getOrCreateUser(userId.trim())
+      const wallet = await getOrCreateWallet(user.id)
+      const category = await findCategory(parsed.category)
 
-    const newBalance =
-      parsed.intent === 'income'
-        ? Number(wallet.balance) + receipt.total
-        : Number(wallet.balance) - receipt.total
+      const description = `Belanja di ${receipt.merchant || 'Toko'}${
+        receipt.items.length > 0 ? ` - ${receipt.items.length} item` : ''
+      }`
 
-    const { error: balanceError } = await supabase
-      .from('wallets')
-      .update({ balance: newBalance })
-      .eq('id', wallet.id)
+      const { data: transaction, error: transactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          wallet_id: wallet.id,
+          category_id: category?.id ?? null,
+          type: parsed.intent === 'income' ? 'income' : 'expense',
+          amount: receipt.total,
+          description,
+          raw_input: receipt.rawText,
+          ai_confidence: Math.max(receipt.confidence, parsed.confidence),
+        })
+        .select('id, amount, description')
+        .single()
 
-    if (balanceError) throw balanceError
+      if (transactionError) throw transactionError
+      if (!transaction) throw new Error('Transaksi gagal dibuat')
 
-    return NextResponse.json({
-      success: true,
-      message: 'Receipt processed successfully',
-      ocr_engine: receipt.ocrEngine,
-      receipt_data: buildReceiptPayload(receipt),
-      parsed_transaction: parsed,
-      transaction: {
-        id: transaction.id,
-        amount: transaction.amount,
-        description: transaction.description,
-        category: category?.name ?? null,
-        wallet: wallet.name,
-        new_balance: newBalance,
-      },
-    })
+      const newBalance =
+        parsed.intent === 'income'
+          ? Number(wallet.balance) + receipt.total
+          : Number(wallet.balance) - receipt.total
+
+      const { error: balanceError } = await supabase
+        .from('wallets')
+        .update({ balance: newBalance })
+        .eq('id', wallet.id)
+
+      if (balanceError) throw balanceError
+
+      return NextResponse.json({
+        success: true,
+        message: 'Receipt processed successfully',
+        ocr_engine: receipt.ocrEngine,
+        receipt_data: buildReceiptPayload(receipt),
+        parsed_transaction: parsed,
+        transaction: {
+          id: transaction.id,
+          amount: transaction.amount,
+          description: transaction.description,
+          category: category?.name ?? null,
+          wallet: wallet.name,
+          new_balance: newBalance,
+        },
+      })
+    } catch (databaseError) {
+      if (!isSupabaseFetchError(databaseError)) throw databaseError
+
+      console.error('OCR save-to-Supabase error:', databaseError)
+      return NextResponse.json({
+        success: true,
+        demo_mode: true,
+        message:
+          'Struk berhasil dibaca dengan OCR lokal Tesseract, tetapi belum tersimpan karena koneksi Supabase gagal. Periksa internet atau konfigurasi Supabase.',
+        ocr_engine: receipt.ocrEngine,
+        receipt_data: buildReceiptPayload(receipt),
+        parsed_transaction: parsed,
+      })
+    }
   } catch (error) {
     console.error('OCR scan-receipt error:', error)
 
     if (isSupabaseFetchError(error)) {
       return jsonError(
         'Gagal menyimpan ke Supabase',
-        'Tidak bisa terhubung ke Supabase. Periksa NEXT_PUBLIC_SUPABASE_URL dan SUPABASE_SERVICE_KEY di .env.local.',
+        'OCR lokal sudah tidak memakai Google Vision, tetapi aplikasi tidak bisa terhubung ke Supabase untuk menyimpan transaksi. Periksa internet, NEXT_PUBLIC_SUPABASE_URL, dan SUPABASE_SERVICE_KEY.',
         503
       )
     }

@@ -70,11 +70,16 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Gagal masuk ke akun demo')
+        throw new Error(data.detail || data.error || 'Gagal masuk ke akun demo')
       }
 
       localStorage.setItem('demo_user_id', DEMO_ACCOUNT.userId)
       localStorage.setItem('demo_user_name', DEMO_ACCOUNT.displayName)
+      if (data.warning) {
+        sessionStorage.setItem('demo_connectivity_warning', String(data.warning))
+      } else {
+        sessionStorage.removeItem('demo_connectivity_warning')
+      }
       onLogin(DEMO_ACCOUNT.userId, DEMO_ACCOUNT.displayName)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal masuk ke akun demo')

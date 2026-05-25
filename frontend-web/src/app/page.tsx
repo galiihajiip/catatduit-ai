@@ -70,6 +70,7 @@ export default function Home() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [connectivityWarning, setConnectivityWarning] = useState<string | null>(null)
   
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
@@ -84,6 +85,7 @@ export default function Home() {
       setUserId(uid)
       setUserName(name)
       setIsLoggedIn(true)
+      setConnectivityWarning(sessionStorage.getItem('demo_connectivity_warning'))
       fetchData(uid)
     }
   }, [])
@@ -120,6 +122,7 @@ export default function Home() {
     setUserName(name)
     localStorage.setItem('demo_user_id', uid)
     localStorage.setItem('demo_user_name', name)
+    setConnectivityWarning(sessionStorage.getItem('demo_connectivity_warning'))
     setIsLoggedIn(true)
     window.history.pushState({}, '', '/')
     fetchData(uid)
@@ -132,6 +135,8 @@ export default function Home() {
     setTransactions([])
     localStorage.removeItem('demo_user_id')
     localStorage.removeItem('demo_user_name')
+    sessionStorage.removeItem('demo_connectivity_warning')
+    setConnectivityWarning(null)
     window.history.pushState({}, '', '/')
   }
 
@@ -166,6 +171,11 @@ export default function Home() {
       />
       
       <main className="lg:pl-72">
+        {connectivityWarning && (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 lg:pl-8">
+            {connectivityWarning}
+          </div>
+        )}
         <header className="sticky top-0 z-30 bg-card/80 backdrop-blur-lg border-b border-gray-100">
           <div className="flex items-center justify-between px-4 lg:px-8 py-4">
             <div className="flex items-center gap-4">
