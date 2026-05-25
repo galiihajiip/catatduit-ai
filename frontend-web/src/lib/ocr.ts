@@ -16,8 +16,10 @@ export interface ReceiptData {
   rawText: string
 }
 
+export type OcrEngine = 'ocrspace' | 'tesseract'
+
 export interface ProcessedReceipt extends ReceiptData {
-  ocrEngine: 'tesseract'
+  ocrEngine: OcrEngine
 }
 
 const MERCHANT_PATTERNS = [
@@ -393,11 +395,65 @@ export async function processReceiptWithTesseract(imageBase64: string): Promise<
   }
 }
 
+export async function processReceiptWithOcrSpace(imageBase64: string): Promise<ReceiptData> {
+  const apiKey = process.env.OCR_SPACE_API_KEY?.trim() || 'helloworld'
+
+  const form = new URLSearchParams()
+  form.set('apikey', apiKey)
+  form.set('language', 'eng')
+  form.set('isOverlayRequired', 'false')
+  form.set('detectOrientation', 'true')
+  form.set('scale', 'true')
+  form.set('OCREngine', '2')
+  form.set('base64Image', `data:image/jpeg;base64,${imageBase64}`)
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 25_000)
+
+  try {
+    const response = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      throw new Error(`OCR.space HTTP ${response.status}`)
+    }
+
+    const data = (await response.json()) as {
+      IsErroredOnProcessing?: boolean
+      ErrorMessage?: string | string[]
+      ParsedResults?: Array<{ ParsedText?: string }>
+    }
+
+    if (data.IsErroredOnProcessing) {
+      const message = Array.isArray(data.ErrorMessage) ? data.ErrorMessage.join('; ') : data.ErrorMessage
+      throw new Error(`OCR.space error: ${message || 'unknown error'}`)
+    }
+
+    const text = data.ParsedResults?.map((entry) => entry.ParsedText ?? '').join('\n').trim()
+    if (!text) {
+      throw new Error('OCR.space tidak menemukan teks di gambar struk')
+    }
+
+    return parseReceiptText(text)
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 export async function processReceipt(imageBase64: string): Promise<ProcessedReceipt> {
-  const receipt = await processReceiptWithTesseract(imageBase64)
-  return {
-    ...receipt,
-    ocrEngine: 'tesseract',
+  try {
+    console.log('OCR: trying OCR.space engine')
+    const receipt = await processReceiptWithOcrSpace(imageBase64)
+    return { ...receipt, ocrEngine: 'ocrspace' }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'OCR.space gagal, fallback ke Tesseract'
+    console.warn(`OCR.space failed, falling back to Tesseract: ${message}`)
+    const receipt = await processReceiptWithTesseract(imageBase64)
+    return { ...receipt, ocrEngine: 'tesseract' }
   }
 }
 
