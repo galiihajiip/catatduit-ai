@@ -341,7 +341,7 @@ export async function processReceiptWithTesseract(imageBase64: string): Promise<
   const buffer = Buffer.from(imageBase64, 'base64')
 
   try {
-    const result = await recognize(buffer, 'ind+eng', {
+    const result = await recognize(buffer, 'eng', {
       logger: (info) => {
         if (info.status === 'recognizing text') {
           console.log(`Tesseract OCR progress: ${Math.round((info.progress ?? 0) * 100)}%`)

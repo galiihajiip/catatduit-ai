@@ -23,8 +23,8 @@ interface ScanResult {
 }
 
 const MAX_CLIENT_IMAGE_SIZE = 8 * 1024 * 1024
-const MAX_CAMERA_IMAGE_WIDTH = 1280
-const OCR_TIMEOUT_MS = 90_000
+const MAX_CAMERA_IMAGE_WIDTH = 720
+const OCR_TIMEOUT_MS = 30_000
 
 function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -34,7 +34,7 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
         else reject(new Error('Gagal mengambil foto dari kamera'))
       },
       'image/jpeg',
-      0.82
+      0.55
     )
   })
 }
@@ -168,7 +168,7 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
     }
 
     setIsProcessing(true)
-    setProcessingMessage('Mengirim foto ke OCR lokal...')
+    setProcessingMessage('Membaca teks struk dengan OCR lokal...')
     setError(null)
     setDemoWarning(null)
     setScanResult(null)

@@ -168,10 +168,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (receipt.total <= 0) {
-      return jsonError('Gagal membaca total struk', 'Total harga tidak ditemukan dari hasil OCR', 422)
-    }
-
     const parsed = parseTransaction(
       [
         receipt.merchant,
@@ -182,6 +178,18 @@ export async function POST(request: NextRequest) {
         .join('\n'),
       receipt.total
     )
+
+    if (receipt.total <= 0) {
+      return NextResponse.json({
+        success: true,
+        demo_mode: true,
+        message:
+          'Foto berhasil dibaca OCR lokal, tetapi total belanja belum terdeteksi. Coba foto lebih dekat/terang, atau masukkan nominal lewat Catat Cepat.',
+        ocr_engine: receipt.ocrEngine,
+        receipt_data: buildReceiptPayload(receipt),
+        parsed_transaction: parsed,
+      })
+    }
 
     if (isSupabasePlaceholder()) {
       return NextResponse.json({
