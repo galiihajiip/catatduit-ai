@@ -22,10 +22,28 @@ interface ScanResult {
   confidence: number
 }
 
+const MAX_CLIENT_IMAGE_SIZE = 8 * 1024 * 1024
+const MAX_CAMERA_IMAGE_WIDTH = 1280
+const OCR_TIMEOUT_MS = 90_000
+
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob)
+        else reject(new Error('Gagal mengambil foto dari kamera'))
+      },
+      'image/jpeg',
+      0.82
+    )
+  })
+}
+
 export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [mode, setMode] = useState<'upload' | 'camera'>('upload')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [processingMessage, setProcessingMessage] = useState('Mohon tunggu sebentar')
   const [scanResult, setScanResult] = useState<ScanResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [demoWarning, setDemoWarning] = useState<string | null>(null)
@@ -34,15 +52,33 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [stream, setStream] = useState<MediaStream | null>(null)
+  const [cameraReady, setCameraReady] = useState(false)
 
   const startCamera = async () => {
     try {
+      setError(null)
+      setCameraReady(false)
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' } // Use back camera on mobile
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       })
       setStream(mediaStream)
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream
+        await new Promise<void>((resolve) => {
+          const video = videoRef.current
+          if (!video || (video.readyState >= 2 && video.videoWidth > 0)) {
+            resolve()
+            return
+          }
+          video.onloadedmetadata = () => resolve()
+          window.setTimeout(resolve, 2000)
+        })
+        await videoRef.current.play().catch(() => undefined)
+        setCameraReady(true)
       }
     } catch (err) {
       setError('Tidak dapat mengakses kamera. Pastikan izin kamera sudah diberikan.')
@@ -55,30 +91,43 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
       stream.getTracks().forEach(track => track.stop())
       setStream(null)
     }
+    setCameraReady(false)
   }
 
-  const capturePhoto = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return
+  const capturePhoto = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) {
+      setError('Kamera belum siap. Tutup modal, buka kamera lagi, lalu coba ulang.')
+      return
+    }
 
     const video = videoRef.current
     const canvas = canvasRef.current
     const context = canvas.getContext('2d')
 
-    if (!context) return
+    if (!context) {
+      setError('Browser tidak bisa membuat gambar dari kamera.')
+      return
+    }
 
-    // Set canvas size to video size
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
+    if (!video.videoWidth || !video.videoHeight) {
+      setError('Preview kamera belum siap. Tunggu 1-2 detik lalu tekan Ambil Foto lagi.')
+      return
+    }
 
-    // Draw video frame to canvas
+    setProcessingMessage('Mengambil dan mengompres foto struk...')
+    const scale = Math.min(1, MAX_CAMERA_IMAGE_WIDTH / video.videoWidth)
+    canvas.width = Math.round(video.videoWidth * scale)
+    canvas.height = Math.round(video.videoHeight * scale)
+
     context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-    // Convert to blob and process
-    canvas.toBlob(async (blob) => {
-      if (blob) {
-        await processImage(blob)
-      }
-    }, 'image/jpeg', 0.95)
+    try {
+      const blob = await canvasToBlob(canvas)
+      await processImage(blob)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal mengambil foto dari kamera')
+      setIsProcessing(false)
+    }
   }, [])
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,20 +143,31 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
   }
 
   const processImage = async (imageFile: Blob) => {
+    if (imageFile.size > MAX_CLIENT_IMAGE_SIZE) {
+      setError('Foto terlalu besar. Coba ambil foto lebih dekat atau gunakan upload gambar yang lebih kecil.')
+      return
+    }
+
     setIsProcessing(true)
+    setProcessingMessage('Mengirim foto ke OCR lokal...')
     setError(null)
     setDemoWarning(null)
     setScanResult(null)
 
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), OCR_TIMEOUT_MS)
+
     try {
       const formData = new FormData()
-      formData.append('file', imageFile)
+      formData.append('file', imageFile, 'receipt.jpg')
       formData.append('user_id', userId)
 
       const response = await fetch('/api/ocr/scan-receipt', {
         method: 'POST',
-        body: formData
+        body: formData,
+        signal: controller.signal,
       })
+      setProcessingMessage('Membaca hasil OCR...')
 
       const text = await response.text()
       let data: {
@@ -136,12 +196,15 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Terjadi kesalahan saat memproses gambar'
       setError(
-        /failed to fetch/i.test(message)
+        err instanceof DOMException && err.name === 'AbortError'
+          ? 'OCR lokal terlalu lama memproses foto. Coba foto struk lebih terang, lebih dekat, dan pastikan hanya area struk yang terlihat.'
+          : /failed to fetch/i.test(message)
           ? 'Tidak bisa menghubungi server OCR lokal. Pastikan npm run dev masih berjalan, lalu coba lagi.'
           : message
       )
       console.error('Process error:', err)
     } finally {
+      window.clearTimeout(timeout)
       setIsProcessing(false)
     }
   }
@@ -271,12 +334,15 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
               </div>
               <button
                 onClick={capturePhoto}
-                disabled={isProcessing || !stream}
+                disabled={isProcessing || !stream || !cameraReady}
                 className="w-full py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary-light transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 <Icons.camera className="w-5 h-5" />
-                {isProcessing ? 'Memproses...' : 'Ambil Foto'}
+                {isProcessing ? 'Memproses...' : cameraReady ? 'Ambil Foto' : 'Menyiapkan Kamera...'}
               </button>
+              <p className="text-center text-xs font-medium text-gray-600">
+                Pastikan struk terang, tidak miring, dan memenuhi sebagian besar layar.
+              </p>
             </div>
           )}
 
@@ -285,7 +351,7 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
             <div className="text-center py-8">
               <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
               <p className="text-text-primary font-medium">Memproses struk...</p>
-              <p className="text-sm text-text-secondary mt-1">Mohon tunggu sebentar</p>
+              <p className="text-sm text-text-secondary mt-1">{processingMessage}</p>
             </div>
           )}
 
