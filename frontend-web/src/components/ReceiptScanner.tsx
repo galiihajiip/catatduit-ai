@@ -23,8 +23,8 @@ interface ScanResult {
 }
 
 const MAX_CLIENT_IMAGE_SIZE = 8 * 1024 * 1024
-const MAX_CAMERA_IMAGE_WIDTH = 720
-const OCR_TIMEOUT_MS = 30_000
+const MAX_CAMERA_IMAGE_WIDTH = 480
+const OCR_TIMEOUT_MS = 20_000
 
 function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -34,9 +34,26 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
         else reject(new Error('Gagal mengambil foto dari kamera'))
       },
       'image/jpeg',
-      0.55
+      0.42
     )
   })
+}
+
+function parseManualAmount(value: string): number {
+  const normalized = value
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/^rp\.?/, '')
+    .replace(/,/g, '.')
+
+  const match = normalized.match(/^(\d+(?:\.\d+)?)(rb|ribu|k|jt|juta)?$/)
+  if (!match) return 0
+
+  const amount = Number.parseFloat(match[1])
+  if (!Number.isFinite(amount)) return 0
+  if (match[2] === 'jt' || match[2] === 'juta') return Math.round(amount * 1_000_000)
+  if (match[2]) return Math.round(amount * 1_000)
+  return Math.round(Number.parseFloat(match[1].replace(/\./g, '')))
 }
 
 export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProps) {
@@ -49,6 +66,9 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
   const [demoWarning, setDemoWarning] = useState<string | null>(null)
   const [capturedPhoto, setCapturedPhoto] = useState<Blob | null>(null)
   const [capturedPreviewUrl, setCapturedPreviewUrl] = useState<string | null>(null)
+  const [manualAmount, setManualAmount] = useState('')
+  const [manualMerchant, setManualMerchant] = useState('')
+  const [manualLoading, setManualLoading] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -62,6 +82,12 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
     }
     setCapturedPhoto(null)
     setCapturedPreviewUrl(null)
+  }
+
+  const resetManualFallback = () => {
+    setManualAmount('')
+    setManualMerchant('')
+    setManualLoading(false)
   }
 
   const startCamera = async () => {
@@ -172,6 +198,7 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
     setError(null)
     setDemoWarning(null)
     setScanResult(null)
+    resetManualFallback()
 
     const controller = new AbortController()
     const timeout = window.setTimeout(() => controller.abort(), OCR_TIMEOUT_MS)
@@ -216,7 +243,7 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
       const message = err instanceof Error ? err.message : 'Terjadi kesalahan saat memproses gambar'
       setError(
         err instanceof DOMException && err.name === 'AbortError'
-          ? 'OCR lokal terlalu lama memproses foto. Coba foto struk lebih terang, lebih dekat, dan pastikan hanya area struk yang terlihat.'
+          ? 'OCR lokal terlalu lama. Foto sudah tersimpan di preview, isi nominal manual di bawah agar transaksi tetap bisa dicatat.'
           : /failed to fetch/i.test(message)
           ? 'Tidak bisa menghubungi server OCR lokal. Pastikan npm run dev masih berjalan, lalu coba lagi.'
           : message
@@ -234,6 +261,7 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
     setError(null)
     setDemoWarning(null)
     clearCapturedPhoto()
+    resetManualFallback()
   }
 
   const handleClose = () => {
@@ -243,6 +271,7 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
     setError(null)
     setDemoWarning(null)
     clearCapturedPhoto()
+    resetManualFallback()
   }
 
   const switchToCamera = () => {
@@ -254,6 +283,56 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
     setMode('upload')
     stopCamera()
     clearCapturedPhoto()
+    resetManualFallback()
+  }
+
+  const submitManualReceipt = async () => {
+    const amount = parseManualAmount(manualAmount)
+    if (amount <= 0) {
+      setError('Nominal manual belum valid. Contoh: 15000, 15rb, atau Rp15.000')
+      return
+    }
+
+    setManualLoading(true)
+    setError(null)
+    try {
+      const merchant = manualMerchant.trim() || 'struk belanja'
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          text: `belanja ${merchant} ${amount}`,
+        }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || 'Gagal mencatat transaksi manual')
+      }
+
+      setScanResult({
+        merchant,
+        total: amount,
+        items_count: 1,
+        items: [
+          {
+            name: merchant,
+            quantity: 1,
+            price: amount,
+            category: data.parsed?.category ?? 'Belanja',
+          },
+        ],
+        confidence: 0.7,
+      })
+      setDemoWarning('OCR dilewati karena terlalu lama. Transaksi dicatat dari nominal manual.')
+      clearCapturedPhoto()
+      onSuccess?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal mencatat transaksi manual')
+    } finally {
+      setManualLoading(false)
+    }
   }
 
   if (!isOpen) {
@@ -361,6 +440,7 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
                     <button
                       onClick={async () => {
                         clearCapturedPhoto()
+                        resetManualFallback()
                         await startCamera()
                       }}
                       disabled={isProcessing}
@@ -374,6 +454,36 @@ export default function ReceiptScanner({ userId, onSuccess }: ReceiptScannerProp
                       className="w-full rounded-xl bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-light disabled:opacity-50"
                     >
                       {isProcessing ? 'Memproses...' : 'Pakai Foto Ini'}
+                    </button>
+                  </div>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm font-bold text-amber-900">
+                      Kalau OCR kelamaan, langsung catat manual dari foto ini.
+                    </p>
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_0.8fr]">
+                      <input
+                        type="text"
+                        value={manualMerchant}
+                        onChange={(event) => setManualMerchant(event.target.value)}
+                        placeholder="Nama toko, contoh: Alfamart"
+                        className="rounded-xl border border-amber-200 bg-white px-4 py-3 text-sm font-semibold text-gray-950 outline-none focus:border-amber-500"
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={manualAmount}
+                        onChange={(event) => setManualAmount(event.target.value)}
+                        placeholder="Total, contoh: 35rb"
+                        className="rounded-xl border border-amber-200 bg-white px-4 py-3 text-sm font-semibold text-gray-950 outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={submitManualReceipt}
+                      disabled={manualLoading || isProcessing}
+                      className="mt-3 w-full rounded-xl bg-amber-500 py-3 text-sm font-bold text-white transition hover:bg-amber-600 disabled:opacity-50"
+                    >
+                      {manualLoading ? 'Mencatat...' : 'Catat Manual dari Foto'}
                     </button>
                   </div>
                 </>
